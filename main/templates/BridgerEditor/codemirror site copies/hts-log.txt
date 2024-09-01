@@ -1,0 +1,58 @@
+HTTrack3.49-2+htsswf+htsjava launched on Mon, 01 Jul 2024 12:26:49 at https://codemirror.net +*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar
+(winhttrack -qwC2%Ps2u1%s%uN0%I0p3DaK0H0%kf2A25000%f#f -F "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)" -%F "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2014], %s -->" -%l "zh, en, *" https://codemirror.net -O1 "C:\Users\Admin\Desktop\codemirror" +*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar )
+
+Information, Warnings and Errors reported for this mirror:
+note:	the hts-log.txt file, and hts-cache folder, may contain sensitive information,
+	such as username/password authentication for websites mirrored in this project
+	do not share these files/folders if you want these information to remain private
+
+12:27:16	Warning: 	Link https://codemirror.net/docs/community/ not scanned (follow robots meta tag)
+12:32:29	Warning: 	Link https://github.com/codemirror/codemirror5/blob/b2d26b4ccb1d0994ae84d18ad8b84018de176da9/keymap/vim.js not scanned (follow robots meta tag)
+12:33:11	Error: 	"Not Found" (404) at link https://codemirror.net/5/demo/get (from https://codemirror.net/5/demo/tern.html)
+12:33:11	Error: 	"Not Found" (404) at link https://codemirror.net/5/demo/codemirror/ (from https://codemirror.net/5/demo/merge.html)
+12:33:11	Error: 	"Not Found" (404) at link https://codemirror.net/5/codemirror-5.65.6.zip (from https://codemirror.net/5/doc/releases.html)
+12:33:11	Error: 	"Not Found" (404) at link https://codemirror.net/5/demo/search/ (from https://codemirror.net/5/doc/releases.html)
+12:33:13	Warning: 	Moved Permanently for https://codemirror.net/mode/julia/
+12:33:13	Warning: 	File has moved from https://codemirror.net/mode/julia/ to https://codemirror.net/5/mode/julia/
+12:33:13	Warning: 	Moved Permanently for https://codemirror.net/mode/shell/
+12:33:13	Warning: 	File has moved from https://codemirror.net/mode/shell/ to https://codemirror.net/5/mode/shell/
+12:33:42	Warning: 	Moved Permanently for https://codemirror.net/mode/r/
+12:33:42	Warning: 	File has moved from https://codemirror.net/mode/r/ to https://codemirror.net/5/mode/r/
+12:33:43	Warning: 	Moved Permanently for https://codemirror.net/mode/markdown/
+12:33:43	Warning: 	File has moved from https://codemirror.net/mode/markdown/ to https://codemirror.net/5/mode/markdown/
+12:33:44	Warning: 	Moved Permanently for https://codemirror.net/mode/clike/
+12:33:44	Warning: 	File has moved from https://codemirror.net/mode/clike/ to https://codemirror.net/5/mode/clike/
+12:33:44	Error: 	"Not Found" (404) at link https://codemirror.net/5/codemirror-5.14.0.zip (from https://codemirror.net/5/doc/releases.html)
+12:33:44	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/kotlin/index.html (from https://codemirror.net/5/doc/releases.html)
+12:33:44	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/jade/index.html (from https://codemirror.net/5/doc/releases.html)
+12:34:15	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/plsql/index.html (from https://codemirror.net/5/doc/releases.html)
+12:34:37	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/mysql/index.html (from https://codemirror.net/5/doc/releases.html)
+12:34:38	Error: 	"Not Found" (404) at link https://codemirror.net/5/https://github.com/codemirror/CodeMirror/compare/v2.35...v2.36 (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/demo/formatting.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/ocaml/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/less/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/xmlpure/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/regex/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/freemarker/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/java (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/php (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/sql (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/mixedtest.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/scheme/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/xquery/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/ometa/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/compress.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/plsql/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/sql/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/python/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/5/doc/contrib/lua/index.html (from https://codemirror.net/5/doc/releases.html)
+12:35:01	Error: 	"Not Found" (404) at link https://codemirror.net/coderush.xyz/ (from https://codemirror.net/5/doc/realworld.html)
+12:35:13	Error: 	"Not Found" (404) at link https://codemirror.net/5/demo/{{url}} (from https://codemirror.net/5/demo/mustache.html)
+12:35:13	Error: 	"Bad Request" (400) at link https://codemirror.net/5/mode/%N/%N.js (from https://codemirror.net/5/demo/loadmode.html)
+12:35:20	Error: 	"Bad Request" (400) at link https://codemirror.net/5/mode/django/{% url 'item_view' item.name|slugify %} (from https://codemirror.net/5/mode/django/index.html)
+12:35:20	Error: 	"Not Found" (404) at link https://codemirror.net/5/1/contrib/lua (from https://codemirror.net/5/mode/lua/index.html)
+12:35:20	Error: 	"Not Found" (404) at link https://codemirror.net/5/mode/immutable/Stream.html (from https://codemirror.net/5/mode/clike/scala.html)
+12:35:27	Error: 	"Not Found" (404) at link https://codemirror.net/5/story.html (from https://codemirror.net/5/doc/internals.html)
+
+HTTrack Website Copier/3.49-2 mirror complete in 8 minutes 38 seconds : 1041 links scanned, 1000 files written (211687656 bytes overall) [186762900 bytes received at 360546 bytes/sec], 210419138 bytes transferred using HTTP compression in 993 files, ratio 87%, 16.9 requests per connection
+(35 errors, 12 warnings, 0 messages)

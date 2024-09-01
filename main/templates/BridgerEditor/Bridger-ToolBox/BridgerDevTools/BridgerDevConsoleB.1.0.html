@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Simple DevTools</title>
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: rgb(0, 255, 68);
+            background-color: #000;
+            border: 1px solid rgb(0, 255, 68);
+            font-family: 'Courier New', Courier, monospace;
+            font-style: bold!important;
+        }
+
+        button {
+            background-color: black;
+            border-style: solid;
+            border-color: rgb(4, 255, 0);
+            color: rgb(4, 255, 0);
+            transition: background-color 0.7s, color 0.7s;
+            border-radius: 4px;
+            font-style: bold!important;
+        }
+
+        button:hover {
+            background-color: rgb(4, 255, 0);
+            color: black;
+        }
+
+        button:active {
+            opacity: 0.7;
+        }
+
+        #toolbar {
+            display: flex;
+            flex-direction: column;
+            width: 250px;
+            background-color: #000000;
+            color: rgb(0, 255, 68);
+            padding: 10px;
+            border-color: rgb(0, 255, 68);
+        }
+
+        #toolbar input, #toolbar button {
+            margin-bottom: 10px;
+            padding: 5px;
+            border: none;
+            border-radius: 4px;
+        }
+
+        #toolbar button {
+            background-color: #000000;
+            color: rgb(0, 255, 68);
+            cursor: pointer;
+            background-color: #000;
+            border-color: rgb(0, 255, 68);
+            border-style: solid;
+            transition: background-color 0.7s, color 0.7s;
+            font-family: 'Courier New', Courier, monospace;
+            font-style: bold!important;
+        }
+
+        #toolbar button:hover {
+            background-color: rgb(4, 255, 0);
+            color: black;
+        }
+
+        #toolbar button:active {
+            opacity: 0.7;
+        }
+
+        #content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #iframe {
+            flex: 1;
+            border: none;
+        }
+
+        #devtools {
+            height: 200px;
+            background-color: rgb(40,40,40);
+            border-top: 1px solid rgb(40,40,40);
+            overflow: auto;
+            padding: 10px;
+            border: 1px solid rgb(0, 255, 68);
+        }
+
+        #devtools pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        #toolbar div {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+
+        input[type=text] {
+            background-color: #000;
+            color: rgb(0, 255, 68);
+            border-color: rgb(0, 255, 68) !important;
+            border-radius: 2px;
+            border-style: solid !important;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        input[type=text]::placeholder{
+            font-family: 'Courier New', Courier, monospace;
+            color: rgb(0, 255, 68);
+        }
+    </style>
+</head>
+<body>
+    <div style="border: 1px solid rgb(0, 255, 68);" id="toolbar">
+        <input type="text" id="urlInput" placeholder="Enter URL" />
+        <button onclick="loadURL()">Load URL</button>
+        <button onclick="showHTML()">Show HTML</button>
+        <button onclick="showCSS()">Show CSS</button>
+        <button onclick="showConsole()">Show Console</button>
+        <div>
+            <input type="text" id="elementInput" placeholder="Element HTML" />
+            <button onclick="addElement()">Add Element</button>
+        </div>
+        <div>
+            <input type="text" id="divSelector" placeholder="Div Selector" />
+            <button onclick="showDivContent()">Show Div Content</button>
+            
+        </div>
+        <button onclick="location.reload()">Reset All</button>
+    </div>
+    <div id="content">
+        <iframe id="iframe" src=""></iframe>
+        <div id="devtools">
+            <pre id="devtoolsContent"></pre>
+        </div>
+    </div>
+
+    <script>
+        const iframe = document.getElementById('iframe');
+        const devtoolsContent = document.getElementById('devtoolsContent');
+
+        function loadURL() {
+            const url = document.getElementById('urlInput').value;
+            iframe.src = url;
+            iframe.onload = () => {
+                console.log('Iframe loaded.');
+                injectConsoleCapture();
+            };
+        }
+
+        function showHTML() {
+            try {
+                if (iframe.contentDocument) {
+                    const html = iframe.contentDocument.documentElement.outerHTML;
+                    devtoolsContent.textContent = html;
+                } else {
+                    throw new Error('iframe.contentDocument is null');
+                }
+            } catch (e) {
+                devtoolsContent.textContent = 'Error: Unable to access HTML content. ' + e.message;
+            }
+        }
+
+        function showCSS() {
+            try {
+                if (iframe.contentDocument) {
+                    const styles = Array.from(iframe.contentDocument.styleSheets)
+                        .map(sheet => {
+                            try {
+                                return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
+                            } catch (e) {
+                                return '';
+                            }
+                        })
+                        .join('\n');
+                    devtoolsContent.textContent = styles;
+                } else {
+                    throw new Error('iframe.contentDocument is null');
+                }
+            } catch (e) {
+                devtoolsContent.textContent = 'Error: Unable to access CSS content. ' + e.message;
+            }
+        }
+
+
+
+
+        function showConsole() {
+            window.addEventListener('message', (event) => {
+    const { type, args } = event.data;
+    const message = `[${type.toUpperCase()}] >>> ${args.join(' ')}`;
+    const logEntry = document.createElement('div');
+    logEntry.textContent = message;
+    devtoolsContent.appendChild(logEntry);
+});
+
+        }
+
+        function injectConsoleCapture() {
+    const scriptContent = `
+        (function() {
+            const originalLog = console.log;
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            const originalInfo = console.info;
+            const messages = [];
+            
+            function capture(type, args) {
+                const message = { type, args: Array.from(args) };
+                messages.push(message);
+                window.parent.postMessage(message, '*');
+            }
+            
+            console.log = function() {
+                capture('log', arguments);
+                originalLog.apply(console, arguments);
+            };
+            
+            console.error = function() {
+                capture('error', arguments);
+                originalError.apply(console, arguments);
+            };
+            
+            console.warn = function() {
+                capture('warn', arguments);
+                originalWarn.apply(console, arguments);
+            };
+            
+            console.info = function() {
+                capture('info', arguments);
+                originalInfo.apply(console, arguments);
+            };
+            
+            window.addEventListener('error', function(event) {
+                capture('error', [event.message]);
+            });
+
+            // Custom code to post message with ">>>" prefix
+            const originalLog = console.log;
+            console.log = function() {
+                const argsArray = Array.from(arguments);
+                const prefixedArgs = argsArray.map(arg => '>>> ' + arg);
+                capture('log', prefixedArgs);
+                originalLog.apply(console, arguments);
+            };
+        })();
+    `;
+    
+    const script = document.createElement('script');
+    script.textContent = scriptContent;
+    iframe.contentDocument.documentElement.appendChild(script);
+}
+
+
+        window.addEventListener('message', (event) => {
+            const { type, args } = event.data;
+            const message = `[${type.toUpperCase()}] ${args.join(' ')}`;
+            const logEntry = document.createElement('div');
+            logEntry.textContent = message;
+            devtoolsContent.appendChild(logEntry);
+            
+       
+});
+
+
+        function addElement() {
+    try {
+        const elementHTML = document.getElementById('elementInput').value;
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = elementHTML;
+        while (tempDiv.firstChild) {
+            iframe.contentDocument.body.appendChild(tempDiv.firstChild);
+        }
+    } catch (e) {
+        devtoolsContent.textContent = 'Error: Unable to add element. ' + e.message;
+    }
+}
+
+
+        function showDivContent() {
+    try {
+        const selector = document.getElementById('divSelector').value.trim(); // 使用 trim() 去除首尾空格
+        if (selector) {
+            const element = iframe.contentDocument.querySelector(selector);
+            if (element) {
+                devtoolsContent.textContent = element.outerHTML;
+            } else {
+                devtoolsContent.textContent = 'Element not found';
+            }
+        } else {
+            devtoolsContent.textContent = 'Error: Selector is empty';
+        }
+    } catch (e) {
+        devtoolsContent.textContent = 'Error: Unable to access div content. ' + e.message;
+    }
+}
+
+    </script>
+</body>
+</html>

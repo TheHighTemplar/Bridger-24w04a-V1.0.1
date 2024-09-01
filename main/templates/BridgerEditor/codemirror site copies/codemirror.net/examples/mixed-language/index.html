@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/mixed-language/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:16 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Mixed-Language Parsing Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-mixed-language-parsing" tabindex="-1">Example: Mixed-Language Parsing</h1>
+<p>A lot of file formats contain other formats inside them—things like
+JavaScript inside HTML <code>&lt;script&gt;</code> tags, HTML inside template literals
+in that JavaScript, or template languages that wrap processing
+instructions around some other language.</p>
+<p>The way <a href="https://lezer.codemirror.net/">Lezer</a>, and thus CodeMirror,
+handle this is by treating the composite language as a combination of
+an outer language (which parses the entire document) and one or more
+inner languages (which parse only some regions, determined by the
+structure of the outer parse tree).</p>
+<h2 id="hierarchical-nesting" tabindex="-1">Hierarchical Nesting</h2>
+<p>For example, in HTML with CSS and JavaScript, HTML provides the outer
+structure, and the content of <code>&lt;style&gt;</code> and <code>&lt;script&gt;</code> tags in that
+structure are given to the CSS and JavaScript parsers. In a template
+language, the outer parser would parse the directive syntax, since
+that determines the structure of the document, and then the space
+between the directives would be given to the target language (often
+HTML).</p>
+<p>The feature that handles this kind of parsing is
+<a href="https://lezer.codemirror.net/docs/ref/#common.parseMixed"><code>parseMixed</code></a>,
+which can be
+<a href="https://lezer.codemirror.net/docs/ref/#lr.ParserConfig.wrap">attached</a>
+to the outer parser to manage the inner parsing.</p>
+<p>Let's pretend the
+<a href="https://github.com/codemirror/lang-html">@codemirror/lang-html</a>
+package doesn't already provide mixed-language parsing, and implement
+parsing of <code>&lt;script&gt;</code> tags ourselves:</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName">parser</span> <span class="tok-keyword">as</span> <span class="tok-variableName tok-definition">htmlParser</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@lezer/html&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName">parser</span> <span class="tok-keyword">as</span> <span class="tok-variableName tok-definition">jsParser</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@lezer/javascript&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">parseMixed</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@lezer/common&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">LRLanguage</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">mixedHTMLParser</span> <span class="tok-operator">=</span> <span class="tok-variableName">htmlParser</span><span class="tok-operator">.</span><span class="tok-propertyName">configure</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">wrap</span><span class="tok-punctuation">:</span> <span class="tok-variableName">parseMixed</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">node</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">name</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;ScriptText&quot;</span> <span class="tok-operator">?</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">parser</span><span class="tok-punctuation">:</span> <span class="tok-variableName">jsParser</span><span class="tok-punctuation">}</span> <span class="tok-operator">:</span> <span class="tok-keyword">null</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">mixedHTML</span> <span class="tok-operator">=</span> <span class="tok-variableName">LRLanguage</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">parser</span><span class="tok-punctuation">:</span> <span class="tok-variableName">mixedHTMLParser</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The function given to <code>parseMixed</code> will be called on the outer tree's
+nodes, and determines whether their content should be parsed with a
+nested parser. The HTML parser conveniently emits a syntax tree node
+<code>ScriptText</code> for the content of <code>&lt;script&gt;</code> tags, and here we're
+telling the mixed parser to parse the content of such nodes using the
+JavaScript parser, and
+“<a href="https://lezer.codemirror.net/docs/ref/#common.NodeProp%5Emounted">mount</a>”
+the resulting tree in place of the script text node.</p>
+<p>As you can see, the highlighting works for both languages. (Lots of
+functionality is missing though, since this code completely bypasses
+the things, like folding information and autocompletion, defined in
+@codemirror/lang-html and @codemirror/lang-javascript.)</p>
+<div id=html-editor></div>
+<h2 id="overlay-nesting" tabindex="-1">Overlay Nesting</h2>
+<p>In the situation above, the nested region neatly matches the structure
+of the outer language—the script text is a single node, covering the
+content of an HTML tag. In some other mixed-language systems, the
+nesting isn't quite so straightforward. For example, in the
+<a href="https://twig.symfony.com/">Twig</a> templating language, the nesting of
+the templating directives might not match the nesting of the the HTML
+in the template, as in this somewhat odd template:</p>
+<pre><code>&lt;div&gt;
+  {{ content }}
+{% if extra_content %}
+  &lt;hr&gt;&lt;/div&gt;&lt;div class=extra&gt;{{ extra_content }}
+{% endif %}
+  &lt;hr&gt;
+&lt;/div&gt;
+</code></pre>
+<p>We could use the template syntax as outer language, parsing that
+document like this:</p>
+<pre><code>Template(
+  Text(&quot;&lt;div&gt;&quot;),
+  Insert(&quot;content&quot;),
+  Conditional(
+    ConditionalOpen(&quot;extra_content&quot;),
+    Text(&quot;&lt;hr&gt;&lt;/div&gt;&lt;div class=extra&gt;&quot;),
+    Insert(&quot;extra_content&quot;),
+    ConditionalClose),
+  Text(&quot;&lt;hr&gt;&lt;/div&gt;&quot;))
+</code></pre>
+<p>But to parse the HTML text, there's no single node in this tree to
+target—it is spread out over multiple nodes, with different parent
+nodes.</p>
+<p>The way Lezer models nesting like this is with an “overlay” mounted
+tree. Instead of replacing a given node, an overlay <em>overlays</em>
+parts of it with the content from a different tree.</p>
+<p>Assuming we have a <a href="twig.grammar.txt">grammar</a> for our outer parser,
+we could define a mixed parser like this.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName">parser</span> <span class="tok-keyword">as</span> <span class="tok-variableName tok-definition">twigParser</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;./twig-parser.js&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">htmlLanguage</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/lang-html&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">foldNodeProp</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">foldInside</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">indentNodeProp</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">mixedTwigParser</span> <span class="tok-operator">=</span> <span class="tok-variableName">twigParser</span><span class="tok-operator">.</span><span class="tok-propertyName">configure</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">props</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-comment">// Add basic folding/indent metadata</span>
+    <span class="tok-variableName">foldNodeProp</span><span class="tok-operator">.</span><span class="tok-propertyName">add</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">Conditional</span><span class="tok-punctuation">:</span> <span class="tok-variableName">foldInside</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">indentNodeProp</span><span class="tok-operator">.</span><span class="tok-propertyName">add</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">Conditional</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">cx</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">closed</span> <span class="tok-operator">=</span> <span class="tok-string2">/^\s*\{% endif/</span><span class="tok-operator">.</span><span class="tok-propertyName">test</span><span class="tok-punctuation">(</span><span class="tok-variableName">cx</span><span class="tok-operator">.</span><span class="tok-propertyName">textAfter</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">return</span> <span class="tok-variableName">cx</span><span class="tok-operator">.</span><span class="tok-propertyName">lineIndent</span><span class="tok-punctuation">(</span><span class="tok-variableName">cx</span><span class="tok-operator">.</span><span class="tok-propertyName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">)</span> <span class="tok-operator">+</span> <span class="tok-punctuation">(</span><span class="tok-variableName">closed</span> <span class="tok-operator">?</span> <span class="tok-number">0</span> <span class="tok-operator">:</span> <span class="tok-variableName">cx</span><span class="tok-operator">.</span><span class="tok-propertyName">unit</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">wrap</span><span class="tok-punctuation">:</span> <span class="tok-variableName">parseMixed</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">node</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">type</span><span class="tok-operator">.</span><span class="tok-propertyName">isTop</span> <span class="tok-operator">?</span> <span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">parser</span><span class="tok-punctuation">:</span> <span class="tok-variableName">htmlLanguage</span><span class="tok-operator">.</span><span class="tok-propertyName">parser</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">overlay</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">node</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">type</span><span class="tok-operator">.</span><span class="tok-propertyName">name</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;Text&quot;</span>
+    <span class="tok-punctuation">}</span> <span class="tok-operator">:</span> <span class="tok-keyword">null</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">twigLanguage</span> <span class="tok-operator">=</span> <span class="tok-variableName">LRLanguage</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">parser</span><span class="tok-punctuation">:</span> <span class="tok-variableName">mixedTwigParser</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Here we set up mixed parsing for the template's top node, but also
+include an <code>overlay</code> property in the object returned from the
+callback. This can be an array of ranges to parse, or a further
+function that is called for each descendent node. The latter is
+preferable when the target node might be large, because it allows more
+efficient incremental reparsing.</p>
+<div id=twig-editor></div>
+<p>Note that, since we used the HTML parser from @codemirror/lang-html,
+parsing inside <code>&lt;script&gt;</code> and <code>&lt;style&gt;</code> tags just works in
+this editor. Mixed parsers can be nested.</p>
+<h2 id="support-extensions" tabindex="-1">Support Extensions</h2>
+<p>CodeMirror's
+<a href="../../docs/ref/index.html#state.EditorState.languageDataAt"><code>languageDataAt</code></a>
+feature can be used to look up values associated with the language
+active at a given point in the document. If you define things like
+autocompletion using this mechanism, it will automatically look up the
+proper completion source in a mixed-language document.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">twigAutocompletion</span> <span class="tok-operator">=</span> <span class="tok-variableName">twigLanguage</span><span class="tok-operator">.</span><span class="tok-propertyName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">autocomplete</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">context</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-comment">/* Twig completion logic here */</span> <span class="tok-keyword">null</span> 
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>It is recommended for mixed-language extensions to include any support
+extensions for their nested languages—extensions have to be loaded
+into an editor to take effect. For example, the editor above doesn't
+load the HTML support extensions, and thus doesn't have HTML
+autocompletion. Here's a <code>twig</code> function that exposes both the
+language and the support extensions.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">html</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/lang-html&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">twig</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">twigLanguage</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">twigAutocompletion</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">html</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">support</span>
+  <span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Loading that into an editor gives you HTML (and JavaScript, and CSS)
+completion support.</p>
+<div id=twig2-editor></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="mixed.js"></script>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/mixed-language/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:17 GMT -->
+</html>

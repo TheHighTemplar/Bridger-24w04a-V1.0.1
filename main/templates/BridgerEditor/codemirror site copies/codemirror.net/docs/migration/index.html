@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/docs/migration/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:20 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror 5 to 6 Migration Guide</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../../examples/index.html" >Examples</a>
+      <a href="../index.html" class=active>Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="migration-guide" tabindex="-1">Migration Guide</h1>
+<p>This guide provides rough translations of how various basic operations
+in the CodeMirror 5.x interface work with the new system. To do
+anything complicated, you'll definitely have to read <a href="../guide/index.html">the
+guide</a>, but for quick translations of a few simple method
+calls, this document might be enough.</p>
+<h2 id="module-system" tabindex="-1">Module System</h2>
+<p>The 5.x library was distributed as UMD modules, which could either be
+loaded directly with <code>&lt;script&gt;</code> tags or bundled as CommonJS modules.
+The new version exposes only modules, which will require some kind of
+build step before you can use them.</p>
+<p>In addition, the library has been split into a number of separate
+packages under the <code>@codemirror</code> scope. Depending on how closely you
+want to configure the editor and how much features you want to load,
+you could start with the <a href="../ref/index.html#codemirror.basicSetup">basic setup</a>,
+or hand-pick the core modules you need from the list provided in the
+<a href="../ref/index.html">reference manual</a>.</p>
+<p>Language support also lives in separate packages. There's a number of
+languages available in dedicated packages, with names like
+<a href="https://github.com/codemirror/lang-javascript"><code>@codemirror/lang-javascript</code></a>
+or <a href="https://github.com/codemirror/lang-rust"><code>@codemirror/lang-rust</code></a>.
+Many of the CodeMirror 5 modes have been ported to CodeMirror 6's
+<a href="../ref/index.html#language.StreamParser">stream-parser</a> interface and are available
+in the
+<a href="https://github.com/codemirror/legacy-modes"><code>@codemirror/legacy-modes</code></a>
+package.</p>
+<p>See the <a href="../../examples/bundle/index.html">bundling example</a> for a basic example
+of how to load the library in the browser.</p>
+<h2 id="creating-an-editor" tabindex="-1">Creating an Editor</h2>
+<p><a href="../ref/index.html#view.EditorView"><code>EditorView</code></a> from the <a href="../ref/index.html#view">view</a> package is
+roughly the equivalent of the <code>CodeMirror</code> class from 5.x. This is a
+stateful object that manages the editor's DOM representation and basic
+user interaction.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">view</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">parent</span><span class="tok-punctuation">:</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">body</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The <a href="../ref/index.html#view.EditorView.constructor%5Econfig.parent"><code>parent</code></a> option
+makes the editor append itself to a given node in the DOM. We'll just
+crudely pass <code>document.body</code> there in these examples, but you'll
+usually pass your custom mount point there. It is also possible not to
+provide it and, after creating the editor, manually insert
+<a href="../ref/index.html#view.EditorView.dom"><code>view.dom</code></a> somewhere.</p>
+<p>The new editor view comes with a bit less built-in behavior than the
+old <code>CodeMirror</code> class, though. By default it doesn't provide things
+like key bindings and an undo history.</p>
+<p>To add a <a href="../ref/index.html#h_undo_history">history</a> and a default set of <a href="../ref/index.html#commands.defaultKeymap">key
+bindings</a>, we must add a few
+<a href="../ref/index.html#state.Extension">extensions</a> to the editor. Configuration lives in
+the state, so in order to do that we'll have to create an <a href="../ref/index.html#state.EditorState">editor
+state</a> and provide that to the view.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">keymap</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">defaultKeymap</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">history</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">historyKeymap</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/commands&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">view</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">history</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">keymap</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-punctuation">...</span><span class="tok-variableName">defaultKeymap</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">...</span><span class="tok-variableName">historyKeymap</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+  <span class="tok-punctuation">]</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">parent</span><span class="tok-punctuation">:</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">body</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Next, in order to highlight source code, we have to load a language
+package and a highlight style, and make sure those are enabled.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">syntaxHighlighting</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">defaultHighlightStyle</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">javascript</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/lang-javascript&quot;</span>
+
+  <span class="tok-comment">// Add these extensions</span>
+  <span class="tok-variableName">javascript</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName">syntaxHighlighting</span><span class="tok-punctuation">(</span><span class="tok-variableName">defaultHighlightStyle</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+</code></pre>
+<p>This gives you an editor with JavaScript highlighting and indentation.</p>
+<p>A line number gutter is also available as an
+<a href="../ref/index.html#view.lineNumbers">extension</a>, as are features like <a href="../ref/index.html#view.rectangularSelection">rectangular
+selection</a> and
+highlighting of <a href="../ref/index.html#view.highlightSpecialChars">non-printing
+characters</a>.</p>
+<p>By default, the view will show the browser's native selection. If you
+prefer something closer to the old custom-drawn selection, use the
+<a href="../ref/index.html#view.drawSelection"><code>drawSelection</code></a> extension. You can also enable
+<a href="../ref/index.html#state.EditorState%5EallowMultipleSelections">multiple selections</a>.</p>
+<h2 id="positions" tabindex="-1">Positions</h2>
+<p>Whereas CodeMirror 5 used <code>{line, ch}</code> objects to point at document
+positions, CodeMirror 6 just uses offsets—the number of characters
+(UTF16 code units) from the start of the document, counting line
+breaks as one character. This decision was made because manipulating
+plain numbers is a lot simpler and more efficient than working with
+such objects.</p>
+<p>To get information about the line that includes a given position, you
+can call <code>.state.doc.</code><a href="../ref/index.html#state.Text.lineAt"><code>lineAt</code></a><code>(pos)</code>. The other
+way around, you can go from a line number to a line object with the
+<a href="../ref/index.html#state.Text.line"><code>line</code></a> method.</p>
+<p>But <strong>note</strong>: in CodeMirror 6 the first line has number 1, whereas
+CodeMirror 5 lines started at 0.</p>
+<p>So to convert between old-style positions and offsets, you could use
+functions like these:</p>
+<pre><code class="language-javascript"><span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">posToOffset</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">doc</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">pos</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">line</span><span class="tok-punctuation">(</span><span class="tok-variableName">pos</span><span class="tok-operator">.</span><span class="tok-propertyName">line</span> <span class="tok-operator">+</span> <span class="tok-number">1</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span> <span class="tok-operator">+</span> <span class="tok-variableName">pos</span><span class="tok-operator">.</span><span class="tok-propertyName">ch</span>
+<span class="tok-punctuation">}</span>
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">offsetToPos</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">doc</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">offset</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">line</span> <span class="tok-operator">=</span> <span class="tok-variableName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">lineAt</span><span class="tok-punctuation">(</span><span class="tok-variableName">offset</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">line</span><span class="tok-punctuation">:</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">number</span> <span class="tok-operator">-</span> <span class="tok-number">1</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">ch</span><span class="tok-punctuation">:</span> <span class="tok-variableName">offset</span> <span class="tok-operator">-</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>For method equivalents shown in this document, assume that positions
+used in the new code are always offsets.</p>
+<h2 id="getting-the-document-and-selection" tabindex="-1">Getting the Document and Selection</h2>
+<p>Your <a href="../ref/index.html#view.EditorView"><code>EditorView</code></a> object has a
+<a href="../ref/index.html#view.EditorView.state"><code>state</code></a> property that holds an object
+representing its current <a href="../ref/index.html#state.EditorState">state</a>. This stores
+things like the <a href="../ref/index.html#state.EditorState.doc">document</a>,
+<a href="../ref/index.html#state.EditorState.selection">selection</a>, and configuration.</p>
+<p>You can access the current document via
+<a href="../ref/index.html#state.EditorState.doc"><code>.state.doc</code></a>. That holds an
+<a href="../ref/index.html#state.Text">object</a> storing the document as a tree of lines.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getValue</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">toString</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getRange</span><span class="tok-punctuation">(</span><span class="tok-variableName">a</span><span class="tok-punctuation">,</span> <span class="tok-variableName">b</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">sliceDoc</span><span class="tok-punctuation">(</span><span class="tok-variableName">a</span><span class="tok-punctuation">,</span> <span class="tok-variableName">b</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getLine</span><span class="tok-punctuation">(</span><span class="tok-variableName">n</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">line</span><span class="tok-punctuation">(</span><span class="tok-variableName">n</span> <span class="tok-operator">+</span> <span class="tok-number">1</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">text</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">lineCount</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">lines</span>
+</code></pre>
+<p>The <a href="../ref/index.html#state.EditorSelection">selection</a>, like in the previous
+version, consists of a number of selection
+<a href="../ref/index.html#state.EditorSelection.ranges">ranges</a>, one of which is considered
+the <a href="../ref/index.html#state.EditorSelection.main">main</a> selection.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getCursor</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">main</span><span class="tok-operator">.</span><span class="tok-propertyName">head</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">listSelections</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">ranges</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getSelection</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">sliceDoc</span><span class="tok-punctuation">(</span>
+  <span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">main</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">main</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getSelections</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">ranges</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span>
+  <span class="tok-variableName tok-definition">r</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">sliceDoc</span><span class="tok-punctuation">(</span><span class="tok-variableName">r</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">r</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">somethingSelected</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">ranges</span><span class="tok-operator">.</span><span class="tok-propertyName">some</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">r</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-operator">!</span><span class="tok-variableName">r</span><span class="tok-operator">.</span><span class="tok-propertyName">empty</span><span class="tok-punctuation">)</span>
+</code></pre>
+<h2 id="making-changes" tabindex="-1">Making Changes</h2>
+<p>In the old interface, changes to the editor state were made via direct
+method calls to the editor object. In version 6, updates are wrapped
+in <a href="../ref/index.html#state.Transaction">transactions</a> and then
+<a href="../ref/index.html#view.EditorView.dispatch">dispatched</a> to the view up to update it.</p>
+<p>This means that different types of update go through a single method,
+which takes one or more objects describing the changes, and applies
+them atomically. Document changes are described by the
+<a href="../ref/index.html#state.TransactionSpec.changes"><code>changes</code></a> property of the
+transaction specs.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">replaceRange</span><span class="tok-punctuation">(</span><span class="tok-variableName">text</span><span class="tok-punctuation">,</span> <span class="tok-variableName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">to</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">insert</span><span class="tok-punctuation">:</span> <span class="tok-variableName">text</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">setValue</span><span class="tok-punctuation">(</span><span class="tok-variableName">text</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-number">0</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">insert</span><span class="tok-punctuation">:</span> <span class="tok-variableName">text</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-comment">// Or, if the entire state (undo history, etc) should be reset</span>
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">setState</span><span class="tok-punctuation">(</span><span class="tok-variableName">EditorState</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-variableName">text</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">...</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">replaceSelection</span><span class="tok-punctuation">(</span><span class="tok-variableName">text</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">replaceSelection</span><span class="tok-punctuation">(</span><span class="tok-variableName">text</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The selection is updated with the
+<a href="../ref/index.html#state.TransactionSpec.selection"><code>selection</code></a> property.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">setCursor</span><span class="tok-punctuation">(</span><span class="tok-variableName">pos</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">anchor</span><span class="tok-punctuation">:</span> <span class="tok-variableName">pos</span><span class="tok-punctuation">}</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">setSelection</span><span class="tok-punctuation">(</span><span class="tok-variableName">anchor</span><span class="tok-punctuation">,</span> <span class="tok-variableName">head</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">anchor</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">head</span><span class="tok-punctuation">}</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">setSelections</span><span class="tok-punctuation">(</span><span class="tok-variableName">ranges</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-variableName">EditorSelection</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span><span class="tok-variableName">ranges</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">extendSelectionsBy</span><span class="tok-punctuation">(</span><span class="tok-variableName">f</span><span class="tok-punctuation">)</span> <span class="tok-variableName">⤳ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-variableName">EditorSelection</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span>
+    <span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">ranges</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">r</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">r</span><span class="tok-operator">.</span><span class="tok-propertyName">extend</span><span class="tok-punctuation">(</span><span class="tok-variableName">f</span><span class="tok-punctuation">(</span><span class="tok-variableName">r</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Situations that would, in the old interface, require the use of
+<code>operation</code> to group updates together tend to not really come up
+anymore, since you will just group all your updates into a single
+transaction.</p>
+<p>When making multiple changes at once
+(<a href="../ref/index.html#state.TransactionSpec.changes"><code>changes</code></a> can also take an array
+of change objects), all <code>from</code> and <code>to</code> positions refer to the
+document at the start of the transaction (as opposed to the document
+created by the changes before it). This makes it a lot easier to apply
+composite changes.</p>
+<p>To create changes based on the selection ranges (along with updated
+selection ranges), it is recommended to use the
+<a href="../ref/index.html#state.EditorState.changeByRange"><code>changeByRange</code></a> helper method.</p>
+<h2 id="dom-structure" tabindex="-1">DOM Structure</h2>
+<p>The new library creates a rather different DOM structure for the
+editor. If you're writing custom CSS for the editor, you'll probably
+have to change it a bit. Class names roughly correspond like this:</p>
+<pre><code>CodeMirror → cm-editor
+CodeMirror-line → cm-line
+CodeMirror-scroll → cm-scroller
+CodeMirror-sizer → cm-content
+CodeMirror-focused → cm-focused
+CodeMirror-gutters → cm-gutters
+CodeMirror-gutter → cm-gutter
+CodeMirror-gutter-elt → cm-gutterElement
+</code></pre>
+<p>Highlighting tokens are no longer assigned stable CSS classes. Rather,
+a <a href="../ref/index.html#language.HighlightStyle">highlight style</a> produces generated
+class names for specific syntactic structures. To write or port a
+theme, see the <a href="https://github.com/codemirror/theme-one-dark">One Dark
+theme</a> as an example.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">focus</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">focus</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">hasFocus</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">hasFocus</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getWrapperElement</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">dom</span>
+
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getScrollerElement</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">scrollDOM</span>
+
+<span class="tok-comment">// This is always a contentEditable element</span>
+<span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">getInputField</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-variableName">→ </span><span class="tok-variableName">cm</span><span class="tok-operator">.</span><span class="tok-propertyName">contentDOM</span>
+</code></pre>
+<h2 id="configuration" tabindex="-1">Configuration</h2>
+<p>Instead of a set of named options, the new configuration system uses a
+tree of <a href="#state.Extension">extension</a> values. Refer to the
+<a href="../guide/index.html#configuration">guide</a> for a description of this system.</p>
+<p>This means that instead of setting an option when creating your
+editor, you just dump the extension value that implements the behavior
+you want into your set of <a href="../ref/index.html#state.EditorStateConfig.extensions">state
+extensions</a>. In many cases (such
+as keymaps), the order of the extensions is relevant—those provided
+first have a higher precedence than those provided later.</p>
+<p>Dynamically changing the configuration is a bit more involved. This
+requires you put parts of your configuration in
+<a href="../ref/index.html#state.Compartment">compartments</a>, and then later dispatch a
+transaction that <a href="../ref/index.html#state.Compartment.reconfigure">reconfigures</a> that
+part.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">tabSize</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">Compartment</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">view</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-comment">// ...</span>
+    <span class="tok-variableName">tabSize</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">EditorState</span><span class="tok-operator">.</span><span class="tok-propertyName">tabSize</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-number">2</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// ...</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">setTabSize</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">size</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">effects</span><span class="tok-punctuation">:</span> <span class="tok-variableName">tabSize</span><span class="tok-operator">.</span><span class="tok-propertyName">reconfigure</span><span class="tok-punctuation">(</span><span class="tok-variableName">EditorState</span><span class="tok-operator">.</span><span class="tok-propertyName">tabSize</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">size</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<h2 id="events" tabindex="-1">Events</h2>
+<p>CodeMirror 6 no longer uses an event system. The main reason for this
+is that that kind of asynchronous notification interface makes it
+really hard to implement more complex customizations in a robust way,
+and that events tend to be too fine-grained—a given event handler just
+tells you about one aspect of what changed, and you need to awkwardly
+piece together information from multiple events to get a bigger
+picture of what's happening.</p>
+<p>Instead, state updates are represented by
+<a href="../ref/index.html#state.Transaction">transactions</a>, which group all the available
+information about the update. If you need to maintain state in sync
+with other parts of the editor state, you'll want to use <a href="../ref/index.html#state.StateField">custom state
+fields</a> for that. Those are updated for every
+transaction using a “reducer”—a function that takes the previous state
+and a transaction, and produces a new state.</p>
+<p>On the imperative side, updates to the view are represented by
+<a href="../ref/index.html#view.ViewUpdate"><code>ViewUpdate</code></a> objects. It is possible to just
+listen for those with an <a href="../ref/index.html#view.EditorView%5EupdateListener">update
+listener</a>. But if you need your
+response to the update to directly affect the editor somehow, you
+might want to define a <a href="../ref/index.html#view.ViewPlugin">view plugin</a> instead.</p>
+<p>Changing or filtering updates as they happen (similar to the old
+<code>&quot;beforeChange&quot;</code> and <code>&quot;beforeSelectionChange&quot;</code> events) can be done
+with <a href="../ref/index.html#state.EditorState%5EchangeFilter">change filters</a>, <a href="../ref/index.html#state.EditorState%5EtransactionFilter">transaction
+filters</a>, or <a href="../ref/index.html#state.EditorState%5EtransactionExtender">transaction
+extenders</a>.</p>
+<h2 id="commands" tabindex="-1">Commands</h2>
+<p>The concept of &quot;commands&quot; still exists, but there is no longer a
+central registry of named commands (getting rid of central registries
+was one of the goals of the redesign). <a href="../ref/index.html#view.Command">Commands</a> are
+simply functions that take an editor instance and, if they can,
+perform a side effect and return true. The
+<a href="../ref/index.html#commands"><code>@codemirror/commands</code></a> package exports a number of basic
+editing commands (many of which are bound in the <a href="../ref/index.html#commands.defaultKeymap">default
+keymap</a>), and other packages may export
+their own relevant commands (see for example <a href="../ref/index.html#commands.undo"><code>undo</code></a>
+and <a href="../ref/index.html#commands.redo"><code>redo</code></a> in the history package).</p>
+<p>Key bindings are defined as <a href="../ref/index.html#view.KeyBinding">objects</a>, and a keymap
+is simply an array of those. Use the <a href="../ref/index.html#view.keymap"><code>keymap</code></a> facet
+to add keymaps to your configuration. When multiple commands are bound
+to a key, they are executed in order of precedence until one of them
+returns true.</p>
+<h2 id="codemirror.fromtextarea" tabindex="-1">CodeMirror.fromTextArea</h2>
+<p>Version 5 has a static <code>fromTextArea</code> method that tries to
+transparently replace a given <code>&lt;textarea&gt;</code> element with a CodeMirror
+instance. Unfortunately, this was never very robust (or even
+transparent), so I've decided not to provide this convenience function
+in version 6.</p>
+<p>Basically, what <code>fromTextArea</code> did was insert the editor as a sibling
+of the textarea, hide the textarea, and, through various hacks, wire
+up form submission to sync the content of the editor back to the
+textarea (automatically syncing on every change gets too expensive for
+big documents).</p>
+<p>In its most minimal form, you can do something like this to get
+similar behavior:</p>
+<pre><code class="language-javascript"><span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">editorFromTextArea</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">textarea</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">extensions</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">view</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-variableName">textarea</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-variableName">textarea</span><span class="tok-operator">.</span><span class="tok-propertyName">parentNode</span><span class="tok-operator">.</span><span class="tok-propertyName">insertBefore</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dom</span><span class="tok-punctuation">,</span> <span class="tok-variableName">textarea</span><span class="tok-punctuation">)</span>
+  <span class="tok-variableName">textarea</span><span class="tok-operator">.</span><span class="tok-propertyName">style</span><span class="tok-operator">.</span><span class="tok-propertyName">display</span> <span class="tok-operator">=</span> <span class="tok-string">&quot;none&quot;</span>
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">textarea</span><span class="tok-operator">.</span><span class="tok-propertyName">form</span><span class="tok-punctuation">)</span> <span class="tok-variableName">textarea</span><span class="tok-operator">.</span><span class="tok-propertyName">form</span><span class="tok-operator">.</span><span class="tok-propertyName">addEventListener</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;submit&quot;</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">textarea</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">toString</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">view</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<h2 id="marked-text" tabindex="-1">Marked Text</h2>
+<p>Marked text (and bookmarks) are called
+<a href="../ref/index.html#view.Decoration">decorations</a> in the new system, and creating them
+is a bit more difficult (but also a lot less error-prone).</p>
+<p>Instead of adding and removing marks through a side effect,
+decorations are <em>provided</em> by extensions, scoped to their source
+extension, and only present as long as that extension continues to
+provide them.</p>
+<p>That means you can't just call a method to mark some text, but have to
+define an extension to manage it. Decorations are kept in a <a href="../ref/index.html#state.RangeSet">range
+set</a>, a data structure that associates ranges in
+the document with some extra data. The extension must
+<a href="../ref/index.html#state.RangeSet.map">map</a> these sets to stay in sync with the
+document on changes.</p>
+<p>This is an example of a simple extension that maintains a set of
+decorations.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">StateField</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">StateEffect</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Decoration</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-comment">// Effects can be attached to transactions to communicate with the extension</span>
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">addMarks</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">filterMarks</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+
+<span class="tok-comment">// This value must be added to the set of extensions to enable this</span>
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">markField</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateField</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-comment">// Start with an empty set of decorations</span>
+  <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">return</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">none</span> <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// This is called whenever the editor updates—it computes the new set</span>
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">value</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">tr</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-comment">// Move the decorations to account for document changes</span>
+    <span class="tok-variableName">value</span> <span class="tok-operator">=</span> <span class="tok-variableName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-punctuation">)</span>
+    <span class="tok-comment">// If this transaction adds or removes decorations, apply those changes</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">effect</span> <span class="tok-keyword">of</span> <span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">effects</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">effect</span><span class="tok-operator">.</span><span class="tok-propertyName">is</span><span class="tok-punctuation">(</span><span class="tok-variableName">addMarks</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-variableName">value</span> <span class="tok-operator">=</span> <span class="tok-variableName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">update</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">add</span><span class="tok-punctuation">:</span> <span class="tok-variableName">effect</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">sort</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">else</span> <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">effect</span><span class="tok-operator">.</span><span class="tok-propertyName">is</span><span class="tok-punctuation">(</span><span class="tok-variableName">filterMarks</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-variableName">value</span> <span class="tok-operator">=</span> <span class="tok-variableName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">update</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">filter</span><span class="tok-punctuation">:</span> <span class="tok-variableName">effect</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">value</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// Indicate that this field provides a set of decorations</span>
+  <span class="tok-propertyName tok-definition">provide</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">f</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">(</span><span class="tok-variableName">f</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>You could use that extension to mark text like this:</p>
+<pre><code class="language-javascript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">strikeMark</span> <span class="tok-operator">=</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">mark</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">attributes</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">style</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;text-decoration: line-through&quot;</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">effects</span><span class="tok-punctuation">:</span> <span class="tok-variableName">addMarks</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-variableName">strikeMark</span><span class="tok-operator">.</span><span class="tok-propertyName">range</span><span class="tok-punctuation">(</span><span class="tok-number">1</span><span class="tok-punctuation">,</span> <span class="tok-number">4</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Or to remove all marks between <code>a</code> and <code>b</code>:</p>
+<pre><code class="language-javascript"><span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">removeMarks</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">a</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">b</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">effects</span><span class="tok-punctuation">:</span> <span class="tok-variableName">filterMarks</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">to</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">to</span> <span class="tok-operator">&lt;=</span> <span class="tok-variableName">a</span> <span class="tok-operator">||</span> <span class="tok-variableName">from</span> <span class="tok-operator">&gt;=</span> <span class="tok-variableName">b</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Read the docs for <a href="../ref/index.html#view.Decoration">decorations</a> to see how to
+collapse parts of the document, insert widgets, or style lines.</p>
+<p>In cases where there would be a <em>lot</em> of marks (for example to manage
+code highlighting), this approach, which eagerly calculates and
+maintains marks for the entire document, may not be ideal. See the
+<a href="../../examples/zebra/index.html">zebra stripes example</a> to learn how to write an
+extension that computes decorations only for visible code.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/docs/migration/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:20 GMT -->
+</html>

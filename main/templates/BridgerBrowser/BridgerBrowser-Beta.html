@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线代理浏览器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #content {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 80%;
+            height: 400px;
+            overflow-y: scroll;
+        }
+    </style>
+</head>
+<body>
+    <h1>在线代理浏览器</h1>
+    <form id="proxyForm">
+        <label for="url">请输入要访问的URL或关键词：</label>
+        <input type="text" id="url" name="url" placeholder="https://www.example.com" required>
+        <button type="submit">访问</button>
+    </form>
+    <div id="content">
+        <!-- 网页内容将在此处显示 -->
+    </div>
+
+    <script>
+        document.getElementById('proxyForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // 阻止表单的默认提交行为
+
+            var url = document.getElementById('url').value;
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'proxy.php?url=' + encodeURIComponent(url), true);
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    // 将获取的网页内容插入到content div中
+                    document.getElementById('content').innerHTML = xhr.responseText;
+                } else {
+                    // 错误处理
+                    document.getElementById('content').innerHTML = '无法加载页面，请检查URL或稍后重试。';
+                    console.error('请求失败，状态码：' + xhr.status); // 调试输出
+                }
+            };
+
+            xhr.onerror = function() {
+                // 处理网络错误
+                document.getElementById('content').innerHTML = '网络错误，请检查您的连接。';
+                console.error('网络错误'); // 调试输出
+            };
+
+            xhr.send();
+        });
+    </script>
+</body>
+</html>

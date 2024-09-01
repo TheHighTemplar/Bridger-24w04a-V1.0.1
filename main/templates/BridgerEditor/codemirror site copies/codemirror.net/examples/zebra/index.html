@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/zebra/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:18 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Zebra Stipes Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-zebra-stripes" tabindex="-1">Example: Zebra Stripes</h1>
+<p>This example defines an extension that styles every Nth line with a
+background.</p>
+<p>To style the stripes in a way that allows
+<a href="../../docs/ref/index.html#view.EditorView%5Etheme">themes</a> to override them, we start by
+defining a <a href="../../docs/ref/index.html#view.EditorView%5EbaseTheme">base theme</a>. It styles the
+<code>cm-zebraStripe</code> class, with different backgrounds for light and dark
+base themes.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">baseTheme</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">baseTheme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;&amp;light .cm-zebraStripe&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#d4fafa&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;&amp;dark .cm-zebraStripe&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#1a2727&quot;</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Next, as an excuse for including configuration functionality, we'll
+allow the caller to configure the distance between the stripes. To
+store the configured distance in a way that is well-defined even if
+multiple instances of the extension are added, we'll store it in a
+<a href="../../docs/ref/index.html#state.Facet">facet</a>.</p>
+<p>The facet takes any number of step values (input type <code>number</code>, the
+first type parameter), and takes their minimum, or 2 if no values were
+provided, as its value (output type, the second type parameter, also
+<code>number</code>).</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Facet</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">stepSize</span> <span class="tok-operator">=</span> <span class="tok-variableName">Facet</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-typeName">number</span><span class="tok-punctuation">,</span> <span class="tok-typeName">number</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">combine</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">values</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">values</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span> <span class="tok-operator">?</span> <span class="tok-variableName">Math</span><span class="tok-operator">.</span><span class="tok-propertyName">min</span><span class="tok-punctuation">(</span><span class="tok-punctuation">...</span><span class="tok-variableName">values</span><span class="tok-punctuation">)</span> <span class="tok-operator">:</span> <span class="tok-number">2</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>We'll export a single function, which returns the
+<a href="../../docs/ref/index.html#state.Extension">extension</a> that installs the zebra stripe
+functionality.</p>
+<p>Note that extension values can be individual extensions (such as facet
+values, created with the <a href="../../docs/ref/index.html#state.Facet.of"><code>of</code> method</a>), or arrays,
+possibly nested, of extensions. Thus they can be easily composed into
+bigger extensions.</p>
+<p>In this case, the function returns our base theme, a value for the
+<code>stepSize</code> facet, if a configuration was provided, and <code>showStripes</code>,
+the <a href="../../docs/ref/index.html#view.ViewPlugin">view plugin</a> that actually adds the styling,
+which we'll define in a moment.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Extension</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">zebraStripes</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">options</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">step</span>?<span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">}</span> <span class="tok-operator">=</span> <span class="tok-punctuation">{</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Extension</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">baseTheme</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">options</span><span class="tok-operator">.</span><span class="tok-propertyName">step</span> <span class="tok-operator">==</span> <span class="tok-keyword">null</span> <span class="tok-operator">?</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-operator">:</span> <span class="tok-variableName">stepSize</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">options</span><span class="tok-operator">.</span><span class="tok-propertyName">step</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">showStripes</span>
+  <span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>First, this helper function, given a view, iterates over the visible
+lines, creating a <a href="../../docs/ref/index.html#view.Decoration%5Eline">line decoration</a> for every
+Nth line.</p>
+<p>The plugin will simply recompute its decorations every time something
+changes. Using a <a href="../../docs/ref/index.html#state.RangeSetBuilder">builder</a>, this is not
+very expensive. In other cases, it can be preferable to preserve
+decorations (<a href="../../docs/ref/index.html#state.RangeSet.map">mapping</a> them through document
+changes) across updates.</p>
+<p>Note that, because facets are always available on every state, whether
+they have been added to that state or not, we can simply
+<a href="../../docs/ref/index.html#state.EditorState.facet">read</a> the value of <code>stepSize</code> to get the
+appropriate step size. When no one configured it, it'll have the value
+<code>2</code> (the result of calling its <code>combine</code> function with the empty
+array).</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Decoration</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">RangeSetBuilder</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">stripe</span> <span class="tok-operator">=</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">line</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">attributes</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">class</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;cm-zebraStripe&quot;</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">stripeDeco</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">step</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">facet</span><span class="tok-punctuation">(</span><span class="tok-variableName">stepSize</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">builder</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">RangeSetBuilder</span>&lt;<span class="tok-typeName">Decoration</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-punctuation">{</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">to</span><span class="tok-punctuation">}</span> <span class="tok-keyword">of</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">visibleRanges</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">pos</span> <span class="tok-operator">=</span> <span class="tok-variableName">from</span><span class="tok-punctuation">;</span> <span class="tok-variableName">pos</span> <span class="tok-operator">&lt;=</span> <span class="tok-variableName">to</span><span class="tok-punctuation">;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">line</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">lineAt</span><span class="tok-punctuation">(</span><span class="tok-variableName">pos</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">(</span><span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">number</span> <span class="tok-operator">%</span> <span class="tok-variableName">step</span><span class="tok-punctuation">)</span> <span class="tok-operator">==</span> <span class="tok-number">0</span><span class="tok-punctuation">)</span>
+        <span class="tok-variableName">builder</span><span class="tok-operator">.</span><span class="tok-propertyName">add</span><span class="tok-punctuation">(</span><span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">stripe</span><span class="tok-punctuation">)</span>
+      <span class="tok-variableName">pos</span> <span class="tok-operator">=</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span> <span class="tok-operator">+</span> <span class="tok-number">1</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">builder</span><span class="tok-operator">.</span><span class="tok-propertyName">finish</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>The <code>showStripes</code> <a href="../../docs/ref/index.html#view.ViewPlugin">view plugin</a>, then, only has to
+advertise that it provides decorations (the <code>decorations</code> option),
+and make sure its <code>decorations</code> property is recomputed when the
+document or the <a href="../../docs/ref/index.html#view.EditorView.viewport">viewport</a> changes.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">ViewPlugin</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">DecorationSet</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">ViewUpdate</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">showStripes</span> <span class="tok-operator">=</span> <span class="tok-variableName">ViewPlugin</span><span class="tok-operator">.</span><span class="tok-propertyName">fromClass</span><span class="tok-punctuation">(</span><span class="tok-keyword">class</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">decorations</span><span class="tok-punctuation">:</span> <span class="tok-typeName">DecorationSet</span>
+
+  <span class="tok-propertyName tok-definition">constructor</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span> <span class="tok-operator">=</span> <span class="tok-variableName">stripeDeco</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">update</span><span class="tok-punctuation">:</span> <span class="tok-typeName">ViewUpdate</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">docChanged</span> <span class="tok-operator">||</span> <span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">viewportChanged</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span> <span class="tok-operator">=</span> <span class="tok-variableName">stripeDeco</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">decorations</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">v</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">v</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The result looks like this:</p>
+<div id=editor></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="zebra.js"></script>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/zebra/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:18 GMT -->
+</html>

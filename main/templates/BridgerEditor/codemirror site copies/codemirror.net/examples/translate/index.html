@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/translate/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:15 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Internationalization Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-internationalization" tabindex="-1">Example: Internationalization</h1>
+<p>Code editor plugins usually don't need to show a <em>lot</em> of UI text, but
+some of them can't get by without showing (or
+<a href="../../docs/ref/index.html#view.EditorView%5Eannounce">speaking</a>) some human-language text. In
+order to be able to this without being stuck with hard-coded text that
+might be in the wrong language, CodeMirror contains rudimentary
+functionality for translatable phrases.</p>
+<p>This support is not up to par with what real internationalization
+libraries support, because that would be overkill for this purpose. It
+just allows you to use the <a href="../../docs/ref/index.html#state.EditorState%5Ephrases"><code>phrases</code>
+facet</a> to provide translated strings for
+specific fixed strings, and provides a <a href="../../docs/ref/index.html#state.EditorState.phrase"><code>phrase</code>
+method</a> which will return the translated
+form of the string you give it if one is available, or the original
+string otherwise.</p>
+<p>Thus, reusable components are encouraged to put a call to
+<code>state.phrase</code> around every human-language string they show to the
+user.</p>
+<p>You are also strongly encouraged to make sure your calls match a
+pattern like <code>/\bphrase\(/</code>, so that they are relatively easy to
+find—in order to translate your component, people will first need to
+figure out which phrases it uses.</p>
+<p>There is not, at this point, a repository of translations for the
+strings in the core modules. The only thing to work with is the
+example below, which will be kept up to date to cover the phrases
+needed to translate a basic CodeMirror setup.</p>
+<h2 id="german-codemirror" tabindex="-1">German CodeMirror</h2>
+<p>This is a map of phrases translating the phrases used in the core
+packages from English to German. You could base your own translations
+for other languages on it.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">germanPhrases</span> <span class="tok-operator">=</span> <span class="tok-punctuation">{</span>
+  <span class="tok-comment">// @codemirror/view</span>
+  <span class="tok-string">&quot;Control character&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Steuerzeichen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// @codemirror/commands</span>
+  <span class="tok-string">&quot;Selection deleted&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Auswahl gelöscht&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// @codemirror/language</span>
+  <span class="tok-string">&quot;Folded lines&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Eingeklappte Zeilen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;Unfolded lines&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Ausgeklappte Zeilen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;to&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;bis&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;folded code&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;eingeklappter Code&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;unfold&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;ausklappen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;Fold line&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Zeile einklappen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;Unfold line&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Zeile ausklappen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// @codemirror/search</span>
+  <span class="tok-string">&quot;Go to line&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Springe zu Zeile&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;go&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;OK&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;Find&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Suchen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;Replace&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Ersetzen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;next&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;nächste&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;previous&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;vorherige&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;all&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;alle&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;match case&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;groß/klein beachten&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;by word&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;ganze Wörter&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;replace&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;ersetzen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;replace all&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;alle ersetzen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;close&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;schließen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;current match&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;aktueller Treffer&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;replaced $ matches&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;$ Treffer ersetzt&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;replaced match on line $&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Treffer on Zeile $ ersetzt&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;on line&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;auf Zeile&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// @codemirror/autocomplete</span>
+  <span class="tok-string">&quot;Completions&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Vervollständigungen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-comment">// @codemirror/lint</span>
+  <span class="tok-string">&quot;Diagnostics&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Diagnosen&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;No diagnostics&quot;</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Keine Diagnosen&quot;</span><span class="tok-punctuation">,</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Given that, you can include an expression like
+<code>EditorState.phrases.of(germanPhrases)</code> in your configuration to
+enable the translation.</p>
+<div id=editor></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="translate.js"></script>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/translate/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:16 GMT -->
+</html>

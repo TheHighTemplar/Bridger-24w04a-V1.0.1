@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/split/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:17 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Split View Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-split-view" tabindex="-1">Example: Split View</h1>
+<p>Though it is possible to create multiple <a href="../../docs/ref/index.html#view.EditorView">views</a>
+from a single <a href="../../docs/ref/index.html#state.EditorState">editor state</a>, those views will
+not, by themselves, stay in sync. States are immutable values, and
+their updated forms held in the different views will simply diverge.</p>
+<p>Thus, to keep the content of two views in sync, you'll have to forward
+changes made in one view to the other. A good place to do this is
+either an overridden <a href="../../docs/ref/index.html#view.EditorView.constructor%5Econfig.dispatch"><code>dispatch</code>
+function</a>, or an
+<a href="../../docs/ref/index.html#view.EditorView%5EupdateListener">update listener</a>. In this example,
+we'll use the former.</p>
+<p>To make sure there's only one undo history, we'll set up one state
+<em>with</em> the history extension, and one without. The state for the main
+editor is set up as normal.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorState</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">defaultKeymap</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">historyKeymap</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">history</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/commands&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">drawSelection</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">keymap</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">lineNumbers</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">startState</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorState</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;The document</span><span class="tok-string2">\n</span><span class="tok-string">is</span><span class="tok-string2">\n</span><span class="tok-string">shared&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">history</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">drawSelection</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">lineNumbers</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">keymap</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span>
+      <span class="tok-punctuation">...</span><span class="tok-variableName">defaultKeymap</span><span class="tok-punctuation">,</span>
+      <span class="tok-punctuation">...</span><span class="tok-variableName">historyKeymap</span><span class="tok-punctuation">,</span>
+    <span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The state for the second editor doesn't track history state, and binds
+history-related keys to perform undo/redo in the main editor.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">undo</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">redo</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/commands&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">otherState</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorState</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-variableName">startState</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">drawSelection</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">lineNumbers</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">keymap</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span>
+      <span class="tok-punctuation">...</span><span class="tok-variableName">defaultKeymap</span><span class="tok-punctuation">,</span>
+      <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">key</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Mod-z&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">run</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">undo</span><span class="tok-punctuation">(</span><span class="tok-variableName">mainView</span><span class="tok-punctuation">)</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+      <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">key</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Mod-y&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">mac</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Mod-Shift-z&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">run</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">redo</span><span class="tok-punctuation">(</span><span class="tok-variableName">mainView</span><span class="tok-punctuation">)</span><span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Next comes the code that will be responsible for broadcasting changes
+between the editors.</p>
+<p>In order to be able to distinguish between regular transactions caused
+by the user and synchronizing transactions from the other editor, we
+define an <a href="../../docs/ref/index.html#state.Annotation">annotation</a> that will be used to tag
+such transactions. Whenever a transaction that makes document changes
+and isn't a synchronizing transaction comes in, it is also dispatched
+to the other editor.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Transaction</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Annotation</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">syncAnnotation</span> <span class="tok-operator">=</span> <span class="tok-variableName">Annotation</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-typeName">boolean</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">syncDispatch</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">tr</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Transaction</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">other</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">update</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-variableName">tr</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-operator">.</span><span class="tok-propertyName">empty</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-operator">!</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">annotation</span><span class="tok-punctuation">(</span><span class="tok-variableName">syncAnnotation</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">annotations</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Annotation</span>&lt;<span class="tok-typeName">any</span>&gt;<span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span><span class="tok-variableName">syncAnnotation</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-bool">true</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span>
+    <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">userEvent</span> <span class="tok-operator">=</span> <span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">annotation</span><span class="tok-punctuation">(</span><span class="tok-variableName">Transaction</span><span class="tok-operator">.</span><span class="tok-propertyName">userEvent</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">userEvent</span><span class="tok-punctuation">)</span> <span class="tok-variableName">annotations</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-variableName">Transaction</span><span class="tok-operator">.</span><span class="tok-propertyName">userEvent</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">userEvent</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">other</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">annotations</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Now we can create the views, and see them in action.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">mainView</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">state</span><span class="tok-punctuation">:</span> <span class="tok-variableName">startState</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">parent</span><span class="tok-punctuation">:</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">querySelector</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;#editor1&quot;</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">dispatch</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">tr</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">syncDispatch</span><span class="tok-punctuation">(</span><span class="tok-variableName">tr</span><span class="tok-punctuation">,</span> <span class="tok-variableName">mainView</span><span class="tok-punctuation">,</span> <span class="tok-variableName">otherView</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">otherView</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">state</span><span class="tok-punctuation">:</span> <span class="tok-variableName">otherState</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">parent</span><span class="tok-punctuation">:</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">querySelector</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;#editor2&quot;</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">dispatch</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">tr</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">syncDispatch</span><span class="tok-punctuation">(</span><span class="tok-variableName">tr</span><span class="tok-punctuation">,</span> <span class="tok-variableName">otherView</span><span class="tok-punctuation">,</span> <span class="tok-variableName">mainView</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The first editor:</p>
+<style>
+  .cm-editor { height: 100px }
+</style>
+<div id=editor1></div>
+<p>And the second:</p>
+<div id=editor2></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="split.js"></script>
+<p>Note that non-document state (like selection) isn't shared between the
+editors. For most such state, it wouldn't be appropriate to share it.
+But there might be cases where additional elements (such as, say,
+breakpoint information) needs to be shared. You'll have to set up your
+syncing code to forward updates to that shared state (probably as
+<a href="../../docs/ref/index.html#state.StateEffect">effects</a>) alongside the document changes.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/split/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:18 GMT -->
+</html>

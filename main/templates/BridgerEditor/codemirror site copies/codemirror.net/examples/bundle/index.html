@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/bundle/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:16 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Bundling Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-bundling-with-rollup" tabindex="-1">Example: Bundling with Rollup</h1>
+<p>CodeMirror is distributed as a collection of modules. These aren't
+directly loadable by the browser—though modern browsers <em>can</em> load
+EcmaScript modules, at the time of writing their mechanism for
+resolving further dependencies is still too primitive to load
+collections of NPM-distributed modules.</p>
+<p>(That being said, there are solutions that work around that by
+rewriting dependencies on the server side, like
+<a href="https://www.snowpack.dev/">Snowpack</a> or
+<a href="https://github.com/marijnh/esmoduleserve">esmoduleserve</a>. I
+definitely recommend a solution like this during development, since it
+tends to introduce less indirection and delay when changing files, but
+for actual deployment, you'll want to do classical bundling for the
+time being.)</p>
+<p>Bundlers are tools that take a given main script (or in some cases
+multiple scripts), and produce a new, generally bigger, script that has
+all (or some) of the script's dependencies (and <em>their</em> dependencies,
+and so on) included. This makes it easier to run modern JavaScript
+systems, which tend to consist of a whole graph of dependencies, in
+the browser. (But also, for example, to combine a library package
+written as a group of files into a single file before uploading it to
+NPM.)</p>
+<p>As far as bundler software goes, I'm a big fan of
+<a href="https://rollupjs.org/">Rollup</a>. But there are also other systems, like
+<a href="https://webpack.js.org/">Webpack</a> and
+<a href="https://parceljs.org/">Parcel</a>, that work well and have their own
+advantages.</p>
+<p>To use Rollup to create a bundle that loads CodeMirror, you must first
+write a main script (say, <code>editor.mjs</code>) that imports the library and
+creates the <a href="../../docs/ref/index.html#view.EditorView">editor view</a>.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">basicSetup</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;codemirror&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">javascript</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/lang-javascript&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">editor</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span><span class="tok-variableName">basicSetup</span><span class="tok-punctuation">,</span> <span class="tok-variableName">javascript</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">parent</span><span class="tok-punctuation">:</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">body</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Next, we must install the necessary packages. The
+<a href="https://github.com/rollup/plugins/tree/master/packages/node-resolve#readme"><code>@rollup/plugin-node-resolve</code></a>
+package is necessary to teach rollup to resolve node-style
+dependencies, so that it knows to find <code>&quot;@codemirror/lang-javascript&quot;</code>
+under <code>node_modules/@codemirror/lang-javascript/dist/index.js</code>.</p>
+<pre><code class="language-shell"># The CodeMirror packages used in our script
+npm i codemirror @codemirror/lang-javascript
+# Rollup and its plugin
+npm i rollup @rollup/plugin-node-resolve
+</code></pre>
+<p>With these, we can run rollup to create the bundle file.</p>
+<pre><code class="language-shell">node_modules/.bin/rollup editor.mjs -f iife -o editor.bundle.js \
+  -p @rollup/plugin-node-resolve
+</code></pre>
+<p>The <code>-f iife</code> file tells Rollup that the output file should be
+formatted as an &quot;immediately-invoked function expression&quot; (as opposed
+to other module styles, such as CommonJS or UMD). This means the code
+will be wrapped in an anonymous function that is then immediately
+called, using that function's scope as a local namespace so that its
+variables don't end up in the global scope.</p>
+<p>The <code>-o</code> option indicates which output file to write to, and the <code>-p</code>
+option loads the resolution plugin. You can also create a
+configuration file (called <code>rollup.config.mjs</code>) and just run <code>rollup -c</code> to take the configuration from that file.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">nodeResolve</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@rollup/plugin-node-resolve&quot;</span>
+<span class="tok-keyword">export</span> <span class="tok-keyword">default</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">input</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;./editor.mjs&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">output</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">file</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;./editor.bundle.js&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">format</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;iife&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">plugins</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span><span class="tok-variableName">nodeResolve</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Now if you load your bundle with a script tag you'll see the editor in
+your HTML page.</p>
+<pre><code class="language-html"><span class="tok-meta">&lt;!doctype html&gt;</span>
+<span class="tok-punctuation">&lt;</span><span class="tok-typeName">meta</span> <span class="tok-propertyName">charset</span><span class="tok-operator">=</span><span class="tok-string">utf8</span><span class="tok-punctuation">&gt;</span>
+<span class="tok-punctuation">&lt;</span><span class="tok-typeName">h1</span><span class="tok-punctuation">&gt;</span>CodeMirror!<span class="tok-punctuation">&lt;/</span><span class="tok-typeName">h1</span><span class="tok-punctuation">&gt;</span>
+<span class="tok-punctuation">&lt;</span><span class="tok-typeName">script</span> <span class="tok-propertyName">src</span><span class="tok-operator">=</span><span class="tok-string">&quot;editor.bundle.js&quot;</span><span class="tok-punctuation">&gt;</span><span class="tok-punctuation">&lt;/</span><span class="tok-typeName">script</span><span class="tok-punctuation">&gt;</span>
+</code></pre>
+<h2 id="bundle-size" tabindex="-1">Bundle Size</h2>
+<p>Because the library is a hundred-thousand-line marvel of JavaScript
+engineering, shipped with its full source code (including comments and
+whitespace), bundles built in the most straightforward way can get
+somewhat big (around 1 megabyte for the <a href="../../docs/ref/index.html#codemirror.basicSetup">basic
+setup</a> and a language mode).
+You can more than halve this by using something like
+<a href="https://terser.org/">Terser</a> or <a href="https://babeljs.io/">Babel</a> to strip
+the comments and whitespace, and rename variables to use shorter
+names, getting the full bundle down to around 400 kilobytes (135
+kilobytes when gzipped for transfer over the network).</p>
+<p>The library is built in such a way that unused code can be eliminated
+by a smart bundler like Rollup (a feature called “tree shaking”). The
+most minimal editor (see below) avoids loading a bunch of extensions,
+taking the full bundle size down to 700 kilobytes and reducing the
+stripped code to 250 kilobytes (75 kilobytes gzipped).</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">minimalSetup</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;codemirror&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">editor</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-variableName">minimalSetup</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">parent</span><span class="tok-punctuation">:</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">body</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>When you need to support multiple languages, it can often be useful to
+dynamically load the language support packages as needed to avoid the
+amount of code the browser has to load. The <a href="https://rollupjs.org/guide/en/#code-splitting">Rollup
+documentation</a> can tell
+you more about how to do this.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/bundle/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:16 GMT -->
+</html>

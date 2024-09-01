@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/lint/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:20 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Lint Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-linter" tabindex="-1">Example: Linter</h1>
+<p>The <a href="../../docs/ref/index.html#lint">@codemirror/lint</a> package provides a way to
+display errors and warnings in your editor. If you give it a
+<a href="../../docs/ref/index.html##lint.LintSource">source</a> function that, when given
+an editor, produces an array of problems, it will call this function
+when changes are made to the document, and display its result.</p>
+<p>The library does <em>not</em> come with a collection of lint sources. Some
+language packages (such as
+<a href="https://github.com/codemirror/lang-javascript/#user-content-eslint">@codemirror/lang-javascript</a>)
+may include integration with lint libraries, but usually setting up a
+source is something you have to do yourself.</p>
+<p>There's two ways to do this:</p>
+<ul>
+<li>
+<p>Find a linter that you can run in the browser, run it on the
+content, and translate its output into the <a href="../../docs/ref/index.html#lint.Diagnostic">expected
+format</a>.</p>
+</li>
+<li>
+<p>Write one from scratch, possibly using the syntax tree kept by the
+editor.</p>
+</li>
+</ul>
+<p>In this example, we'll do the latter.</p>
+<p>Assume for a second that the boss has decided that regular expressions
+are the work of the devil (to be fair, he's not entirely wrong), and
+should be forbidden in the entire codebase. We want a linter that
+highlights any use of a regular expression in JavaScript code.</p>
+<p>Conveniently, the <a href="https://github.com/lezer-parser/javascript">JavaScript
+parser</a> emits a specific
+node type for regular expression literals, so all we have to do is
+iterate over the parse tree and emit a warning for every node like
+that we find.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">syntaxTree</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">linter</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Diagnostic</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/lint&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">regexpLinter</span> <span class="tok-operator">=</span> <span class="tok-variableName">linter</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">diagnostics</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Diagnostic</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>
+  <span class="tok-variableName">syntaxTree</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">cursor</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">iterate</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">node</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">name</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;RegExp&quot;</span><span class="tok-punctuation">)</span> <span class="tok-variableName">diagnostics</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">severity</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;warning&quot;</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">message</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Regular expressions are FORBIDDEN&quot;</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">actions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">{</span>
+        <span class="tok-propertyName tok-definition">name</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Remove&quot;</span><span class="tok-punctuation">,</span>
+        <span class="tok-propertyName tok-definition">apply</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">to</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">}</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">}</span>
+      <span class="tok-punctuation">}</span><span class="tok-punctuation">]</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">diagnostics</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p><a href="../../docs/ref/index.html#lint.Diagnostic">Diagnostics</a> (the objects returned
+by a lint source) must have <code>from</code> and <code>to</code> properties indicating the
+range they apply to, a
+<a href="../../docs/ref/index.html#lint.Diagnostic.severity">severity</a> field, and a
+message.</p>
+<p>This one also uses the optional
+<a href="../../docs/ref/index.html#lint.Diagnostic.actions"><code>actions</code></a> field to add an
+“action” for the diagnostic. This adds a button to the diagnostic that
+can be clicked to perform some effect, like automatically fixing the
+problem (which this does in a very crude way) or providing further
+context.</p>
+<p>The result of a call to <a href="../../docs/ref/index.html#lint.linter"><code>linter</code></a> is
+an extension that you can include in a (JavaScript) editor to get a
+result like this:</p>
+<div id=editor></div>
+<p>The gutter only appears if you also include
+<a href="../../docs/ref/index.html#lint.lintGutter"><code>lintGutter</code></a>. You can press
+Ctrl-Shift-m (Cmd-Shift-m on macOS) to show a list of diagnostics in a
+panel below the editor.</p>
+<script defer src="../../codemirror.js"></script>
+<script defer src="lint.js"></script>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/lint/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:20 GMT -->
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:26:50 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta property="og:title" content="CodeMirror"><meta property="og:type" content="website"><meta property="og:url" content="index.html"><meta property="og:image" content="style/logo.svg"><meta property="og:description" content="In-browser code editor"><title>CodeMirror</title>
+<link rel=stylesheet href=style/site.css>
+<link rel=icon href=style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="examples/index.html" >Examples</a>
+      <a href="docs/index.html" >Documentation</a>
+      <a href="try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><script defer src="codemirror.js"></script>
+<script defer src="demo.js"></script>
+
+<article>
+
+<h1>Extensible Code Editor</h1>
+
+<p>CodeMirror is a code editor component for the web. It can be used
+in websites to implement a text input field with support for many
+editing features, and has a rich programming interface to allow
+further extension.</p>
+
+<div id=editor></div>
+
+<p>This is a CodeMirror field, configured for editing JavaScript code.</p>
+
+<h2 class=hr id=features>Features</h2>
+
+<ul class="grid-list-3">
+  <li>
+    <h3>Accessibility</h3>
+    <p>Works well with screen readers and keyboard-only users.</p>
+  </li>
+  <li>
+    <h3>Mobile Support</h3>
+    <p>Use the platform's native selection and editing features on phones.</p>
+  </li>
+  <li><a href="docs/ref/index.html#view.EditorView.bidiSpans" class=blocklink>
+    <h3>Bidirectional Text</h3>
+    <p>Support mixing of right-to-left and left-to-right text.</p>
+  </a></li>
+  <li><a href="examples/lang-package/index.html" class=blocklink>
+    <h3>Syntax Highlighting</h3>
+    <p>Color code to reflect syntactic structure.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#view.lineNumbers" class=blocklink>
+    <h3>Line Numbers</h3>
+    <p>Display gutters with line numbers or other information next to the code.</p>
+  </a></li>
+  <li><a href="examples/autocompletion/index.html" class=blocklink>
+    <h3>Autocompletion</h3>
+    <p>Provide language-specific completion hints in the editor.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#language.foldCode" class=blocklink>
+    <h3>Code Folding</h3>
+    <p>Temporarily hide parts of the document.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#search" class=blocklink>
+    <h3>Search/Replace</h3>
+    <p>Editor-specific search, regexp search, and replace functionality.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#language.syntaxTree" class=blocklink>
+    <h3>Full Parsing</h3>
+    <p>Detailed parse trees allow many types of language integration.</p>
+  </a></li>
+  <li><a href="docs/guide/index.html#extension" class=blocklink>
+    <h3>Extension Interface</h3>
+    <p>Robustly implement demanding editor extensions.</p>
+  </a></li>
+  <li><a href="docs/guide/index.html#modularity" class=blocklink>
+    <h3>Modularity</h3>
+    <p>Most features are implemented on top of a generic public API.</p>
+  </a></li>
+  <li><a href="examples/million/index.html" class=blocklink>
+    <h3>Speed</h3>
+    <p>Remains responsive even on huge documents and long lines.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#autocomplete.closeBrackets" class=blocklink>
+    <h3>Bracket Closing</h3>
+    <p>Automatically insert matching brackets during typing.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#lint" class=blocklink>
+    <h3>Linting</h3>
+    <p>Show error and warning messages in the editor.</p>
+  </a></li>
+  <li><a href="examples/decoration/index.html" class=blocklink>
+    <h3>Flexible Styling</h3>
+    <p>Mix font styles and sizes, add widgets in the content.</p>
+  </a></li>
+  <li><a href="examples/styling/index.html#themes" class=blocklink>
+    <h3>Theming</h3>
+    <p>Import or create custom visual editor styles.</p>
+  </a></li>
+  <li><a href="examples/collab/index.html" class=blocklink>
+    <h3>Collaborative Editing</h3>
+    <p>Allow multiple users to edit the same document.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#commands.history" class=blocklink>
+    <h3>Undo History</h3>
+    <p>Undo and redo functionality with collab editing support.</p>
+  </a></li>
+  <li><a href="docs/ref/index.html#state.EditorState^allowMultipleSelections" class=blocklink>
+    <h3>Multiple Selections</h3>
+    <p>Select and edit multiple ranges of the document at once.</p>
+  </a></li>
+  <li><a href="examples/translate/index.html" class=blocklink>
+    <h3>Internationalization</h3>
+    <p>Provide custom text to display or announce to the user.</p>
+  </a></li>
+  <li><a href="docs/index.html" class=blocklink>
+    <h3>...and more</h3>
+    <p>Find a full description of the library's features in the docs.</p>
+  </a></li>
+  
+</ul>
+
+<h2 class=hr id=about>About</h2>
+
+<p>CodeMirror is open source under a permissive license
+(<a href="https://github.com/codemirror/dev/blob/master/LICENSE">MIT</a>).
+It is being developed
+on <a href="https://github.com/codemirror/dev">GitHub</a>.
+Contributions are welcome.</p>
+
+<p style="margin-left: 15px"><strong>If you are using
+CodeMirror <u>commercially</u>, there is a <u>social</u> (but no
+legal) expectation that you help fund its maintenance.
+<a href="http://marijnhaverbeke.nl/fund/">Start here</a></strong>.</p>
+
+<p>The library supports browsers up from Internet Explorer 11
+(with <a href="examples/ie11/index.html">some polyfills</a>).</p>
+
+<p>Discussing the project, or asking questions, is best done on
+the <a href="https://discuss.codemirror.net/">forum</a>. Bugs should
+be reported through
+the <a href="https://github.com/codemirror/dev/issues">issue
+tracker</a>. We aim to be an inclusive, welcoming community. To make
+that explicit, we have
+a <a href="http://contributor-covenant.org/version/1/1/0/">code of
+conduct</a> that applies to communication around the project.</p>
+
+<h2 class=hr id=languages>Language Support</h2>
+
+<p>A full parser package, often with language-specific integration and
+extension code, exists for the following languages:</p>
+
+<ul class="grid-list-5">
+  <li><a href="https://github.com/codemirror/lang-angular" class=blocklink><strong>Angular</strong></a>
+  <li><a href="https://github.com/codemirror/lang-css" class=blocklink><strong>CSS</strong></a>
+  <li><a href="https://github.com/codemirror/lang-cpp" class=blocklink><strong>C++</strong></a>
+  <li><a href="https://github.com/codemirror/lang-go" class=blocklink><strong>Go</strong></a>
+  <li><a href="https://github.com/codemirror/lang-html" class=blocklink><strong>HTML</strong></a>
+  <li><a href="https://github.com/codemirror/lang-java" class=blocklink><strong>Java</strong></a>
+  <li><a href="https://github.com/codemirror/lang-javascript" class=blocklink><strong>JavaScript</strong></a>
+  <li><a href="https://github.com/codemirror/lang-json" class=blocklink><strong>JSON</strong></a>
+  <li><a href="https://github.com/codemirror/lang-liquid" class=blocklink><strong>Liquid</strong></a>
+  <li><a href="https://github.com/codemirror/lang-markdown" class=blocklink><strong>Markdown</strong></a>
+  <li><a href="https://github.com/codemirror/lang-php" class=blocklink><strong>PHP</strong></a>
+  <li><a href="https://github.com/codemirror/lang-python" class=blocklink><strong>Python</strong></a>
+  <li><a href="https://github.com/codemirror/lang-rust" class=blocklink><strong>Rust</strong></a>
+  <li><a href="https://github.com/codemirror/lang-sass" class=blocklink><strong>Sass</strong></a>
+  <li><a href="https://github.com/codemirror/lang-vue" class=blocklink><strong>Vue</strong></a>
+  <li><a href="https://github.com/codemirror/lang-xml" class=blocklink><strong>XML</strong></a>
+  <li><a href="https://github.com/codemirror/lang-yaml" class=blocklink><strong>YAML</strong></a>
+</ul>
+
+<p>There is also a collection
+of <a href="https://github.com/codemirror/legacy-modes">CodeMirror 5
+modes</a> that can be used, and
+a list of <a href="docs/community/index.html#language">community-maintained
+language packages</a>. If your language is not listed above, you may still
+find a solution there.</p>
+
+<h2 class=hr id=sponsors>Sponsors</h2>
+
+<p>These wonderful companies and organizations help fund development and maintenance of CodeMirror.</p>
+
+<style>
+
+div.sponsors h3 {
+  color: #777;
+  font-size: 16px;
+  text-align: right;
+  font-family: inherit;
+  font-weight: inherit;
+  margin: 0;
+  min-width: 6em;
+  margin-bottom: 4px;
+}
+div.sponsors.diamond h3, div.sponsors.gold h3 {
+  margin-bottom: -5px;
+}
+
+div.sponsors img { vertical-align: middle }
+
+div.sponsorlist {
+  display: flex;
+}
+
+div.diamond div.sponsorlist, div.gold div.sponsorlist {
+  flex-direction: column;
+  gap: 10px;
+}
+
+div.silver div.sponsorlist, div.bronze div.sponsorlist {
+  justify-content: start;
+  flex-wrap: wrap;
+  row-gap: 16px;
+  column-gap: 16px;
+}
+div.sponsors a.textual, div.sponsors a.captioned {
+  color: black;
+}
+
+div.sponsors.diamond img, div.sponsors.gold img {
+  max-width: calc(100% - 2em);
+}
+div.sponsors.gold a {
+  display: block
+}
+div.sponsors.gold a img {
+  height: 70px;
+}
+div.sponsors.gold a.captioned {
+  font-size: 200%;
+}
+div.sponsors.gold a.captioned img {
+  vertical-align: middle;
+  width: auto;
+}
+
+div.sponsors.silver img {
+  height: 60px;
+}
+div.sponsors.bronze img {
+  height: 38px;
+}
+div.sponsors.bronze a.textual, div.sponsors.bronze a.captioned {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 18px;
+  line-height: 38px;
+  padding: 0 5px;
+}
+div.sponsors.bronze a.captioned {
+  line-height: 36px;
+}
+a.captioned img {
+  margin-right: 0.5em;
+}
+</style>
+
+<!--<div class="sponsors diamond">
+  <h3>Diamond</h3>
+  <div class=sponsorlist></div>
+</div>-->
+<div class="sponsors gold">
+  <h3>Gold</h3>
+  <div class=sponsorlist>
+    <a href="https://www.desmos.com/"><img src="style/logo/desmos.svg" alt="Desmos" loading=lazy></a>
+    <a href="https://holmusk.com/" class=captioned><img src="style/logo/holmusk.svg" alt="" loading=lazy>Holmusk</a>
+    <a href="https://repl.it/" style="margin-left: -7px"><img src="style/logo/replit.svg" alt="Repl.it" loading=lazy></a>
+    <a href="https://about.sourcegraph.com/"><img src="style/logo/sourcegraph.svg" alt="Sourcegraph" loading=lazy></a>
+    <a href="https://wikimediafoundation.org/"><img src="style/logo/wikimedia.svg" alt="Wikimedia Foundation" loading=lazy></a>
+  </div>
+</div>
+<div class="sponsors silver">
+  <h3>Silver</h3>
+  <div class=sponsorlist>
+    <a href="https://www.airplane.dev/"><img src="style/logo/airplane.svg" alt="Airplane" loading=lazy></a>
+    <a href="https://cargo.site/"><img src="style/logo/cargo.svg" alt="Cargo" style="padding: 0 5px" loading=lazy></a>
+    <a href="https://codepen.io/"><img src="style/logo/codepen.svg" alt="CodePen" loading=lazy></a>
+    <a href="https://www.dataiku.com/"><img src="style/logo/dataiku.png" alt="Dataiku" loading=lazy></a>
+    <a href="https://www.labware.com/"><img src="style/logo/labware.png" alt="Labware" loading=lazy></a>
+    <a href="https://www.overleaf.com/"><img src="style/logo/overleaf.png" alt="Overleaf" loading=lazy></a>
+    <a href="https://www.prisma.io/"><img src="style/logo/prisma.svg" alt="Prisma" loading=lazy></a>
+    <a href="https://rockset.com/"><img src="style/logo/rockset.svg" alt="Rockset" load=lazy></a>
+    <a href="https://4me.com/"><img src="style/logo/4me.svg" alt="4me" style="border-radius: 0" loading=lazy></a>
+  </div>
+</div>
+<div class="sponsors bronze">
+  <h3>Bronze</h3>
+  <div class=sponsorlist>
+    <a href="https://www.amplenote.com/" class=textual>Amplenote</a>
+    <a href="https://startupandrew.com/" class=textual>Andrew Lee</a>
+    <a href="https://anvil.works/"><img src="style/logo/anvil.svg" alt="Anvil" loading=lazy></a>
+    <a href="https://www.artcompiler.com/" class=captioned><img src="style/logo/artcompiler.svg" alt="" loading=lazy>ARTCOMPILER</a>
+    <a href="https://www.basedash.com/"><img src="style/logo/basedash.svg" alt="Basedash" loading=lazy></a>
+    <a href="https://buildkite.com/"><img src="style/logo/buildkite.png" alt="Buildkite" loading=lazy></a>
+    <a href="https://www.executeprogram.com/"><img src="style/logo/executeprogram.svg" alt="Execute Program" loading=lazy></a>
+    <a href="https://www.jetbrains.com/"><img src="style/logo/jetbrains.svg" alt="JetBrains" loading=lazy></a>
+    <a href="https://www.nuclino.com/"><img src="style/logo/nuclino.png" alt="Nuclino" loading=lazy></a>
+    <a href="https://obsidian.md/"><img src="style/logo/obsidian.svg" alt="Obsidian" loading=lazy></a>
+    <a href="https://www.pobox.com/"><img src="style/logo/pobox.png" alt="Pobox" loading=lazy></a>
+    <a href="https://primocms.org/"><img src="style/logo/primo.svg" alt="primo" loading=lazy></a>
+    <a href="https://resources.co/"><img src="style/logo/resources.png" alt="Resources.co" load=lazy></a>
+    <a href="https://route4me.com/"><img src="style/logo/route4me.svg" alt="Route4Me" load=lazy></a>
+    <a href="https://www.superhi.com/"><img src="style/logo/superhi.png" alt="superhi" loading=lazy></a>
+    <a href="https://supernotes.app/"><img src="style/logo/supernotes.png" alt="Supernotes" loading=lazy></a>
+    <a href="https://www.systeminit.com/"><img src="style/logo/system-init.svg" alt="System Initiative" loading=lazy></a>
+    <a href="https://uibakery.io/"><img src="style/logo/uibakery.svg" alt="UI Bakery" loading=lazy></a>
+    <a href="https://val.town/"><img src="style/logo/val.svg" alt="Val Town" loading=lazy></a>
+  </div>
+</div>
+
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:26:59 GMT -->
+</html>

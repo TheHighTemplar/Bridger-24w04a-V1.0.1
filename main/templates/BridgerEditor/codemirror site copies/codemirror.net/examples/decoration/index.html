@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/decoration/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:14 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Decoration Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-decorations" tabindex="-1">Example: Decorations</h1>
+<p>The DOM structure inside a CodeMirror editor is managed by the editor
+itself. Inside the <code>cm-content</code> element, any attempt to add attributes
+or change the structure of nodes will usually just lead to the editor
+immediately resetting the content back to what it used to be.</p>
+<p>So to style content, replace content, or add additional elements in
+between the content, we have to tell the editor to do so. That is what
+<a href="../../docs/ref/index.html#view.Decoration">decorations</a> are for.</p>
+<h2 id="types-of-decorations" tabindex="-1">Types of Decorations</h2>
+<p>There are four different types of decorations that you can add to your
+content.</p>
+<ul>
+<li>
+<p><a href="../../docs/ref/index.html#view.Decoration%5Emark">Mark decorations</a> are the most common.
+These add some attributes or wrapping DOM element to pieces of
+content. Syntax highlighting, for example, is done with mark
+decorations.</p>
+</li>
+<li>
+<p><a href="../../docs/ref/index.html#view.Decoration%5Ewidget">Widget decorations</a> insert a DOM element
+in the editor content. You could use this to, for example, add a
+color picker widget next to a color code. Widgets can be inline
+elements or <a href="../../docs/ref/index.html#view.Decoration%5Ewidget%5Espec.block">blocks</a>.</p>
+</li>
+<li>
+<p><a href="../../docs/ref/index.html#view.Decoration%5Ereplace">Replacing decorations</a> <em>hide</em> a stretch
+of content. This is useful for code folding or replacing an element
+in the text with something else. It is possible to display a
+<a href="../../docs/ref/index.html#view.Decoration%5Ereplace%5Espec.widget">widget</a> instead of the
+replaced text.</p>
+</li>
+<li>
+<p><a href="../../docs/ref/index.html#view.Decoration%5Eline">Line decorations</a>, when positioned at the
+start of a line, can influence the attributes of the DOM element
+that wraps the line.</p>
+</li>
+</ul>
+<p>Calling these functions gives you a <code>Decoration</code> object, which just
+describes the type of decoration and which you can often reuse between
+instances of decorations. The <a href="../../docs/ref/index.html#state.RangeValue.range"><code>range</code></a>
+method on these objects gives you an actual decorated range, which
+holds both the type and a pair of <code>from</code>/<code>to</code> document offsets.</p>
+<h2 id="decoration-sources" tabindex="-1">Decoration Sources</h2>
+<p>Decorations are provided to the editor using the
+<a href="../../docs/ref/index.html#state.RangeSet"><code>RangeSet</code></a> data structure, which stores a
+collection of values (in this case the decorations) with ranges (start
+and end positions) associated with them. This data structure helps
+with things like efficiently updating the positions in a big set of
+decorations when the document changes.</p>
+<p>Decorations are provided to the editor view through a
+<a href="../../docs/ref/index.html#view.EditorView%5Edecorations">facet</a>. There are two ways to provide
+them—directly, or though a function that will be called with a view
+instance to produce a set of decorations. Decorations that
+signficantly change the vertical layout of the editor, for example by
+replacing line breaks or inserting block widgets, must be provided
+directly, since indirect decorations are only retrieved after the
+viewport has been computed.</p>
+<p>Indirect decorations are appropriate for things like syntax
+highlighting or search match highlighting, where you might want to
+just render the decorations inside the
+<a href="../../docs/ref/index.html#view.EditorView.viewport">viewport</a> or the current <a href="../../docs/ref/index.html#view.EditorView.visibleRanges">visible
+ranges</a>, which can help a lot with
+performance.</p>
+<p>Let's start with an example that keeps decorations in the state, and
+provides them directly.</p>
+<h2 id="underlining-command" tabindex="-1">Underlining Command</h2>
+<p>Say we want to implement an editor extension that allows the user to
+underline parts of the document. To do this, we could define a <a href="../../docs/ref/index.html#state.StateField">state
+field</a> that tracks which parts of the document are
+underlined, and provides <a href="../../docs/ref/index.html#view.Decoration%5Emark">mark decoration</a>
+that draw those underlines.</p>
+<p>To keep the code simple, the field stores only the decoration range
+set. It doesn't do things like joining overlapping underlines, but
+just dumps any newly underlined region into its set of ranges.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Decoration</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">DecorationSet</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">StateField</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">StateEffect</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">addUnderline</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">}</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">map</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">to</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">change</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-variableName">change</span><span class="tok-operator">.</span><span class="tok-propertyName">mapPos</span><span class="tok-punctuation">(</span><span class="tok-variableName">from</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-variableName">change</span><span class="tok-operator">.</span><span class="tok-propertyName">mapPos</span><span class="tok-punctuation">(</span><span class="tok-variableName">to</span><span class="tok-punctuation">)</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">underlineField</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateField</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-typeName">DecorationSet</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">none</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">underlines</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">tr</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">underlines</span> <span class="tok-operator">=</span> <span class="tok-variableName">underlines</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">e</span> <span class="tok-keyword">of</span> <span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">effects</span><span class="tok-punctuation">)</span> <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">is</span><span class="tok-punctuation">(</span><span class="tok-variableName">addUnderline</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-variableName">underlines</span> <span class="tok-operator">=</span> <span class="tok-variableName">underlines</span><span class="tok-operator">.</span><span class="tok-propertyName">update</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+        <span class="tok-propertyName tok-definition">add</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span><span class="tok-variableName">underlineMark</span><span class="tok-operator">.</span><span class="tok-propertyName">range</span><span class="tok-punctuation">(</span><span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span>
+      <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">underlines</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">provide</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">f</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">(</span><span class="tok-variableName">f</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">underlineMark</span> <span class="tok-operator">=</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">mark</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">class</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;cm-underline&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Note that the <code>update</code> method starts by
+<a href="../../docs/ref/index.html#state.RangeSet.map">mapping</a> its ranges through the
+transaction's changes. The old set refers to positions in the old
+document, and the new state must get a set with positions in the new
+document, so unless you completely recompute your decoration set,
+you'll generally want to map it though document changes.</p>
+<p>Then it checks if the <a href="../../docs/ref/index.html#state.StateEffect">effect</a> we defined for
+adding underlines is present in the transaction, and if so, extends
+the decoration set with more ranges.</p>
+<p>Next we define a command that, if any text is selected, adds an
+underline to it. We'll just make it automatically enable the state
+field (and a <a href="../../docs/ref/index.html#view.EditorView%5EbaseTheme">base theme</a>) on demand, so
+that no further configuration is necessary.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">underlineTheme</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">baseTheme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;.cm-underline&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span> <span class="tok-propertyName tok-definition">textDecoration</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;underline 3px red&quot;</span> <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">underlineSelection</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">effects</span><span class="tok-punctuation">:</span> <span class="tok-typeName">StateEffect</span>&lt;<span class="tok-typeName">unknown</span>&gt;<span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">ranges</span>
+    <span class="tok-operator">.</span><span class="tok-propertyName">filter</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">r</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-operator">!</span><span class="tok-variableName">r</span><span class="tok-operator">.</span><span class="tok-propertyName">empty</span><span class="tok-punctuation">)</span>
+    <span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">to</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">addUnderline</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-variableName">effects</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span> <span class="tok-keyword">return</span> <span class="tok-bool">false</span>
+
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">field</span><span class="tok-punctuation">(</span><span class="tok-variableName">underlineField</span><span class="tok-punctuation">,</span> <span class="tok-bool">false</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">effects</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">appendConfig</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-variableName">underlineField</span><span class="tok-punctuation">,</span>
+                                              <span class="tok-variableName">underlineTheme</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">effects</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-bool">true</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>And finally, this keymap binds that command to Ctrl-h (Cmd-h on
+macOS). The <code>preventDefault</code> field is there because even when the
+command doesn't apply, we don't want the browser's default behavior to
+happen.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">keymap</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">underlineKeymap</span> <span class="tok-operator">=</span> <span class="tok-variableName">keymap</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">key</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Mod-h&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">preventDefault</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">run</span><span class="tok-punctuation">:</span> <span class="tok-variableName">underlineSelection</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+</code></pre>
+<div id="editor-underline"></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="underline.js"></script>
+<h2 id="boolean-toggle-widgets" tabindex="-1">Boolean Toggle Widgets</h2>
+<p>Next, we'll look at a plugin that displays a checkbox widget next to
+boolean literals, and allows the user to click that to flip the
+literal.</p>
+<p>Widget decorations don't directly contain their widget DOM. Apart from
+helping keep mutable objects out of the editor state, this additional
+level of indirection also makes it possible to recreate widgets
+without redrawing the DOM for them. We'll use that later by simply
+recreating our decoration set whenever the document changes.</p>
+<p>Thus, we must first define a subclass of
+<a href="../../docs/ref/index.html#view.WidgetType"><code>WidgetType</code></a> that draws the widget.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">WidgetType</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">class</span> <span class="tok-className">CheckboxWidget</span> <span class="tok-keyword">extends</span> <span class="tok-variableName">WidgetType</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">constructor</span><span class="tok-punctuation">(</span><span class="tok-keyword">readonly</span> <span class="tok-variableName tok-definition">checked</span><span class="tok-punctuation">:</span> <span class="tok-typeName">boolean</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-atom">super</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">}</span>
+
+  <span class="tok-propertyName tok-definition">eq</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">other</span><span class="tok-punctuation">:</span> <span class="tok-typeName">CheckboxWidget</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">return</span> <span class="tok-variableName">other</span><span class="tok-operator">.</span><span class="tok-propertyName">checked</span> <span class="tok-operator">==</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">checked</span> <span class="tok-punctuation">}</span>
+
+  <span class="tok-propertyName tok-definition">toDOM</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">wrap</span> <span class="tok-operator">=</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createElement</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;span&quot;</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">wrap</span><span class="tok-operator">.</span><span class="tok-propertyName">setAttribute</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;aria-hidden&quot;</span><span class="tok-punctuation">,</span> <span class="tok-string">&quot;true&quot;</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">wrap</span><span class="tok-operator">.</span><span class="tok-propertyName">className</span> <span class="tok-operator">=</span> <span class="tok-string">&quot;cm-boolean-toggle&quot;</span>
+    <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">box</span> <span class="tok-operator">=</span> <span class="tok-variableName">wrap</span><span class="tok-operator">.</span><span class="tok-propertyName">appendChild</span><span class="tok-punctuation">(</span><span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createElement</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;input&quot;</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">box</span><span class="tok-operator">.</span><span class="tok-propertyName">type</span> <span class="tok-operator">=</span> <span class="tok-string">&quot;checkbox&quot;</span>
+    <span class="tok-variableName">box</span><span class="tok-operator">.</span><span class="tok-propertyName">checked</span> <span class="tok-operator">=</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">checked</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">wrap</span>
+  <span class="tok-punctuation">}</span>
+
+  <span class="tok-propertyName tok-definition">ignoreEvent</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">return</span> <span class="tok-bool">false</span> <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Decorations contain instances of this class (which are cheap to
+create). When the view updates itself, if it finds it already has a
+drawn instance of such a widget in the position where the widget
+occurs (using the <code>eq</code> method to determine equivalence), it will
+simply reuse that.</p>
+<p>It is also possible to optimize updating of DOM structure for widgets
+of the same type but with different content by defining an
+<a href="../../docs/ref/index.html#view.WidgetType.updateDOM"><code>updateDOM</code></a> method. But that doesn't
+help much here.</p>
+<p>The produced DOM wraps the checkbox in a <code>&lt;span&gt;</code> element, mostly
+because Firefox handles checkboxes with <code>contenteditable=false</code> poorly
+(running into browser quirks is common around the edges of
+contenteditable). We'll also tell screen readers to ignore it since
+the feature doesn't really work without a pointing device anyway.</p>
+<p>Finally, the widget's <code>ignoreEvents</code> method tells the editor to not
+ignore events that happen in the widget. This is necessary to allow an
+editor-wide event handler (defined later) to handle interaction with
+it.</p>
+<p>Next, this function uses the editor's <a href="../../docs/ref/index.html#language.syntaxTree">syntax
+tree</a> (assuming the JavaScript language is
+enabled) to locate boolean literals in the visible parts of the editor
+and create widgets for them.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Decoration</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">syntaxTree</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">checkboxes</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">widgets</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>
+  <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-punctuation">{</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">to</span><span class="tok-punctuation">}</span> <span class="tok-keyword">of</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">visibleRanges</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">syntaxTree</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">iterate</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">enter</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">node</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+        <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">name</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;BooleanLiteral&quot;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+          <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">isTrue</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">sliceString</span><span class="tok-punctuation">(</span><span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span><span class="tok-punctuation">)</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;true&quot;</span>
+          <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">deco</span> <span class="tok-operator">=</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">widget</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+            <span class="tok-propertyName tok-definition">widget</span><span class="tok-punctuation">:</span> <span class="tok-keyword">new</span> <span class="tok-variableName">CheckboxWidget</span><span class="tok-punctuation">(</span><span class="tok-variableName">isTrue</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+            <span class="tok-propertyName tok-definition">side</span><span class="tok-punctuation">:</span> <span class="tok-number">1</span>
+          <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+          <span class="tok-variableName">widgets</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-variableName">deco</span><span class="tok-operator">.</span><span class="tok-propertyName">range</span><span class="tok-punctuation">(</span><span class="tok-variableName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+        <span class="tok-punctuation">}</span>
+      <span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">set</span><span class="tok-punctuation">(</span><span class="tok-variableName">widgets</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>That function is used by a <a href="../../docs/ref/index.html#view.ViewPlugin">view plugin</a> that keeps
+an up-to-date decoration set as the document or viewport changes.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">ViewUpdate</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">ViewPlugin</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">DecorationSet</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">checkboxPlugin</span> <span class="tok-operator">=</span> <span class="tok-variableName">ViewPlugin</span><span class="tok-operator">.</span><span class="tok-propertyName">fromClass</span><span class="tok-punctuation">(</span><span class="tok-keyword">class</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">decorations</span><span class="tok-punctuation">:</span> <span class="tok-typeName">DecorationSet</span>
+
+  <span class="tok-propertyName tok-definition">constructor</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span> <span class="tok-operator">=</span> <span class="tok-variableName">checkboxes</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">update</span><span class="tok-punctuation">:</span> <span class="tok-typeName">ViewUpdate</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">docChanged</span> <span class="tok-operator">||</span> <span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">viewportChanged</span> <span class="tok-operator">||</span>
+        <span class="tok-variableName">syntaxTree</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">startState</span><span class="tok-punctuation">)</span> <span class="tok-operator">!=</span> <span class="tok-variableName">syntaxTree</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span> <span class="tok-operator">=</span> <span class="tok-variableName">checkboxes</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">decorations</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">v</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">v</span><span class="tok-operator">.</span><span class="tok-propertyName">decorations</span><span class="tok-punctuation">,</span>
+
+  <span class="tok-propertyName tok-definition">eventHandlers</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">mousedown</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">e</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">target</span> <span class="tok-operator">=</span> <span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">target</span> <span class="tok-keyword">as</span> <span class="tok-typeName">HTMLElement</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">target</span><span class="tok-operator">.</span><span class="tok-propertyName">nodeName</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;INPUT&quot;</span> <span class="tok-operator">&amp;&amp;</span>
+          <span class="tok-variableName">target</span><span class="tok-operator">.</span><span class="tok-propertyName">parentElement</span><span class="tok-operator">!</span><span class="tok-operator">.</span><span class="tok-propertyName">classList</span><span class="tok-operator">.</span><span class="tok-propertyName">contains</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;cm-boolean-toggle&quot;</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+        <span class="tok-keyword">return</span> <span class="tok-variableName">toggleBoolean</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-punctuation">,</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">posAtDOM</span><span class="tok-punctuation">(</span><span class="tok-variableName">target</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The options given to the plugin tell the editor that, firstly, it can
+<a href="../../docs/ref/index.html#view.PluginSpec.decorations">get</a> decorations from this plugin, and
+secondly, that as long as the plugin is active, the given <code>mousedown</code>
+handler should be registered. The handler checks the event target to
+recognize clicks on checkboxes, and uses the following helper to
+actually toggle booleans.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">toggleBoolean</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">pos</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">before</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">sliceString</span><span class="tok-punctuation">(</span><span class="tok-variableName">Math</span><span class="tok-operator">.</span><span class="tok-propertyName">max</span><span class="tok-punctuation">(</span><span class="tok-number">0</span><span class="tok-punctuation">,</span> <span class="tok-variableName">pos</span> <span class="tok-operator">-</span> <span class="tok-number">5</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-variableName">pos</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">change</span>
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">before</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;false&quot;</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">change</span> <span class="tok-operator">=</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-variableName">pos</span> <span class="tok-operator">-</span> <span class="tok-number">5</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-variableName">pos</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">insert</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;true&quot;</span><span class="tok-punctuation">}</span>
+  <span class="tok-keyword">else</span> <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">before</span><span class="tok-operator">.</span><span class="tok-propertyName">endsWith</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;true&quot;</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">change</span> <span class="tok-operator">=</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-variableName">pos</span> <span class="tok-operator">-</span> <span class="tok-number">4</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-variableName">pos</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">insert</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;false&quot;</span><span class="tok-punctuation">}</span>
+  <span class="tok-keyword">else</span>
+    <span class="tok-keyword">return</span> <span class="tok-bool">false</span>
+  <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-variableName">change</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-bool">true</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>After adding the plugin as an extension to a (JavaScript) editor, you
+get something like this:</p>
+<div id="editor-checkbox"></div>
+<script defer src="checkbox.js"></script>
+<p>To see an example of line decorations, check out the <a href="../zebra/index.html">zebra stripe
+example</a>.</p>
+<h2 id="atomic-ranges" tabindex="-1">Atomic Ranges</h2>
+<p>In some cases, such as with most replacing decorations larger than a
+single character, you want editing actions to treat the ranges as
+atomic elements, skipping over them during cursor motion, and
+backspacing them out in one step.</p>
+<p>The <a href="../../docs/ref/index.html#view.EditorView%5EatomicRanges"><code>EditorView.atomicRanges</code></a> facet
+can be provided range sets (usually the same set that we're using for
+the decorations) and will make sure cursor motion skips the ranges in
+that set.</p>
+<p>Let's implement an extension that replaces placeholder names like
+<code>[[this]]</code> with widgets, and makes the editor treat them as atoms.</p>
+<p><a href="../../docs/ref/index.html#view.MatchDecorator"><code>MatchDecorator</code></a> is a helper class that can
+be used to quickly set up view plugins that decorate all matches of a
+given regular expression in the viewport.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">MatchDecorator</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">placeholderMatcher</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-variableName">MatchDecorator</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">regexp</span><span class="tok-punctuation">:</span> <span class="tok-string2">/\[\[(\w+)\]\]/g</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">decoration</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">match</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">replace</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">widget</span><span class="tok-punctuation">:</span> <span class="tok-keyword">new</span> <span class="tok-variableName">PlaceholderWidget</span><span class="tok-punctuation">(</span><span class="tok-variableName">match</span><span class="tok-punctuation">[</span><span class="tok-number">1</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>(<code>PlaceholderWidget</code> is a straightforward subclass of
+<a href="../../docs/ref/index.html#view.WidgetType"><code>WidgetType</code></a> that renders the given name in a
+styled element.)</p>
+<p>We'll use the matcher to create and maintain the decorations in our
+plugin. It also <a href="../../docs/ref/index.html#view.PluginSpec.provide">provides</a> the decoration
+set as atomic ranges.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Decoration</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">DecorationSet</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span>
+        <span class="tok-variableName tok-definition">ViewPlugin</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">ViewUpdate</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">placeholders</span> <span class="tok-operator">=</span> <span class="tok-variableName">ViewPlugin</span><span class="tok-operator">.</span><span class="tok-propertyName">fromClass</span><span class="tok-punctuation">(</span><span class="tok-keyword">class</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">placeholders</span><span class="tok-punctuation">:</span> <span class="tok-typeName">DecorationSet</span>
+  <span class="tok-propertyName tok-definition">constructor</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">placeholders</span> <span class="tok-operator">=</span> <span class="tok-variableName">placeholderMatcher</span><span class="tok-operator">.</span><span class="tok-propertyName">createDeco</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">update</span><span class="tok-punctuation">:</span> <span class="tok-typeName">ViewUpdate</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">placeholders</span> <span class="tok-operator">=</span> <span class="tok-variableName">placeholderMatcher</span><span class="tok-operator">.</span><span class="tok-propertyName">updateDeco</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-punctuation">,</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">placeholders</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">decorations</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">instance</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">instance</span><span class="tok-operator">.</span><span class="tok-propertyName">placeholders</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">provide</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">plugin</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">atomicRanges</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">plugin</span><span class="tok-punctuation">(</span><span class="tok-variableName">plugin</span><span class="tok-punctuation">)</span>?.<span class="tok-propertyName">placeholders</span> <span class="tok-operator">||</span> <span class="tok-variableName">Decoration</span><span class="tok-operator">.</span><span class="tok-propertyName">none</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<div id="editor-placeholder"></div>
+<script defer src="placeholder.js"></script>
+<p>It is possible to implement something like that in a custom way with <a href="../../docs/ref/index.html#state.EditorState%5EtransactionFilter">transaction filters</a>, if you need</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/decoration/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:15 GMT -->
+</html>

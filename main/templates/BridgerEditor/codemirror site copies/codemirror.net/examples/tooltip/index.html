@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/tooltip/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:19 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Tooltip Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-tooltips" tabindex="-1">Example: Tooltips</h1>
+<p>The <a href="../../docs/ref/index.html#h_tooltips">@codemirror/view</a> package provides
+functionality for displaying tooltips over the editor—widgets floating
+over the content, aligned to some position in that content.</p>
+<p>In keeping with the style of the rest of the interface, tooltips are
+not added and removed to an editor through side effects, but instead
+controlled by the content of a <a href="../../docs/ref/index.html#view.showTooltip">facet</a>. This
+does make them slightly involved to set up, but by directly tying the
+tooltips to the state they reflect we avoid a whole class of potential
+synchronization problems.</p>
+<h2 id="cursor-position" tabindex="-1">Cursor Position</h2>
+<p>This first example implements a tooltip that displays a row:column
+position above the cursor.</p>
+<div id=editor></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="tooltip.js"></script>
+<p>Dynamic facet values need to be rooted somewhere—usually in a state
+field. The field below holds the set of tooltips, basing them on the
+current selection state. We'll only show tooltips for cursors (not
+range selections), but there can be multiple cursors, so the tooltips
+are kept in an array.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Tooltip</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">showTooltip</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">StateField</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">cursorTooltipField</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateField</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-keyword">readonly</span> <span class="tok-typeName">Tooltip</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">:</span> <span class="tok-variableName">getCursorTooltips</span><span class="tok-punctuation">,</span>
+
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">tooltips</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">tr</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">docChanged</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-operator">!</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-punctuation">)</span> <span class="tok-keyword">return</span> <span class="tok-variableName">tooltips</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">getCursorTooltips</span><span class="tok-punctuation">(</span><span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+
+  <span class="tok-propertyName tok-definition">provide</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">f</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">showTooltip</span><span class="tok-operator">.</span><span class="tok-propertyName">computeN</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-variableName">f</span><span class="tok-punctuation">]</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">state</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">field</span><span class="tok-punctuation">(</span><span class="tok-variableName">f</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The <a href="../../docs/ref/index.html#state.StateField%5Edefine%5Econfig.provide"><code>provide</code></a> option, used
+with <a href="../../docs/ref/index.html#state.Facet.computeN"><code>computeN</code></a>, is the way to provide
+multiple facet inputs from a state field.</p>
+<p>Often the field that manages your tooltips will be a bit less
+trivial. For example, the autocompletion extension tracks the active
+completion state in a field, and provides zero or one tooltips (the
+completion widget) from that.</p>
+<p>The helper function used by that state field looks like this:</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorState</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">getCursorTooltips</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">state</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorState</span><span class="tok-punctuation">)</span><span class="tok-punctuation">:</span> <span class="tok-keyword">readonly</span> <span class="tok-typeName">Tooltip</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">selection</span><span class="tok-operator">.</span><span class="tok-propertyName">ranges</span>
+    <span class="tok-operator">.</span><span class="tok-propertyName">filter</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">range</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">range</span><span class="tok-operator">.</span><span class="tok-propertyName">empty</span><span class="tok-punctuation">)</span>
+    <span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">range</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">line</span> <span class="tok-operator">=</span> <span class="tok-variableName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">lineAt</span><span class="tok-punctuation">(</span><span class="tok-variableName">range</span><span class="tok-operator">.</span><span class="tok-propertyName">head</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">text</span> <span class="tok-operator">=</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">number</span> <span class="tok-operator">+</span> <span class="tok-string">&quot;:&quot;</span> <span class="tok-operator">+</span> <span class="tok-punctuation">(</span><span class="tok-variableName">range</span><span class="tok-operator">.</span><span class="tok-propertyName">head</span> <span class="tok-operator">-</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span>
+        <span class="tok-propertyName tok-definition">pos</span><span class="tok-punctuation">:</span> <span class="tok-variableName">range</span><span class="tok-operator">.</span><span class="tok-propertyName">head</span><span class="tok-punctuation">,</span>
+        <span class="tok-propertyName tok-definition">above</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">,</span>
+        <span class="tok-propertyName tok-definition">strictSide</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">,</span>
+        <span class="tok-propertyName tok-definition">arrow</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">,</span>
+        <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+          <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">dom</span> <span class="tok-operator">=</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createElement</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;div&quot;</span><span class="tok-punctuation">)</span>
+          <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">className</span> <span class="tok-operator">=</span> <span class="tok-string">&quot;cm-tooltip-cursor&quot;</span>
+          <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">textContent</span> <span class="tok-operator">=</span> <span class="tok-variableName">text</span>
+          <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">dom</span><span class="tok-punctuation">}</span>
+        <span class="tok-punctuation">}</span>
+      <span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Tooltips are represented as <a href="../../docs/ref/index.html#view.Tooltip">objects</a> that provide
+the position of the tooltip, its orientation relative to that position
+(we want our tooltips above the cursor,
+<a href="../../docs/ref/index.html#view.Tooltip.strictSide">even</a> when there's no room in the
+viewport), whether to show a triangle-arrow on the tooltip, and a
+function that draws it.</p>
+<p>This <a href="../../docs/ref/index.html#view.Tooltip.create"><code>create</code></a> function handles the
+DOM-related and imperative part of the tooltip. Its <a href="../../docs/ref/index.html#view.TooltipView">return
+value</a> can also define functions that should be
+called when the tooltip is added to the DOM or the view state updates.</p>
+<p>Active tooltips are displayed as fixed-position elements. We add some
+padding and a border radius to ours, and set the background on both
+the element and the arrow to purple. The <code>:after</code> element produces a
+pseudo-border for the arrow, which we don't want here, so we make it
+transparent.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">cursorTooltipBaseTheme</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">baseTheme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;.cm-tooltip.cm-tooltip-cursor&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#66b&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">color</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;white&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">border</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;none&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">padding</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;2px 7px&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">borderRadius</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;4px&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-string">&quot;&amp; .cm-tooltip-arrow:before&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">borderTopColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#66b&quot;</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+    <span class="tok-string">&quot;&amp; .cm-tooltip-arrow:after&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">borderTopColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;transparent&quot;</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>And finally we can define a function that returns the extensions
+needed to enable this feature: the field and the base theme.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">cursorTooltip</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">[</span><span class="tok-variableName">cursorTooltipField</span><span class="tok-punctuation">,</span> <span class="tok-variableName">cursorTooltipBaseTheme</span><span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<h2 id="hover-tooltips" tabindex="-1">Hover Tooltips</h2>
+<p>The tooltip package also exports a helper function
+<a href="../../docs/ref/index.html#view.hoverTooltip"><code>hoverTooltip</code></a>, which can be used to define
+tooltips that show up when the user hovers over the document. This
+demo will show tooltips with the word you're hovering over.</p>
+<div id=hover-editor></div>
+<script defer src="hover.js"></script>
+<p>When defining a hover tooltip, you provide a function that will be
+called when the pointer pauses over the editor. It gets the position
+near the pointer and the side of that position the pointer is on, and
+can optionally return a tooltip that should be displayed.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">hoverTooltip</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">wordHover</span> <span class="tok-operator">=</span> <span class="tok-variableName">hoverTooltip</span><span class="tok-punctuation">(</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">pos</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">side</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-punctuation">{</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">to</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">text</span><span class="tok-punctuation">}</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">lineAt</span><span class="tok-punctuation">(</span><span class="tok-variableName">pos</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">start</span> <span class="tok-operator">=</span> <span class="tok-variableName">pos</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">end</span> <span class="tok-operator">=</span> <span class="tok-variableName">pos</span>
+  <span class="tok-keyword">while</span> <span class="tok-punctuation">(</span><span class="tok-variableName">start</span> <span class="tok-operator">&gt;</span> <span class="tok-variableName">from</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-string2">/\w/</span><span class="tok-operator">.</span><span class="tok-propertyName">test</span><span class="tok-punctuation">(</span><span class="tok-variableName">text</span><span class="tok-punctuation">[</span><span class="tok-variableName">start</span> <span class="tok-operator">-</span> <span class="tok-variableName">from</span> <span class="tok-operator">-</span> <span class="tok-number">1</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-variableName">start</span><span class="tok-operator">--</span>
+  <span class="tok-keyword">while</span> <span class="tok-punctuation">(</span><span class="tok-variableName">end</span> <span class="tok-operator">&lt;</span> <span class="tok-variableName">to</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-string2">/\w/</span><span class="tok-operator">.</span><span class="tok-propertyName">test</span><span class="tok-punctuation">(</span><span class="tok-variableName">text</span><span class="tok-punctuation">[</span><span class="tok-variableName">end</span> <span class="tok-operator">-</span> <span class="tok-variableName">from</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-variableName">end</span><span class="tok-operator">++</span>
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">start</span> <span class="tok-operator">==</span> <span class="tok-variableName">pos</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-variableName">side</span> <span class="tok-operator">&lt;</span> <span class="tok-number">0</span> <span class="tok-operator">||</span> <span class="tok-variableName">end</span> <span class="tok-operator">==</span> <span class="tok-variableName">pos</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-variableName">side</span> <span class="tok-operator">&gt;</span> <span class="tok-number">0</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">return</span> <span class="tok-keyword">null</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">pos</span><span class="tok-punctuation">:</span> <span class="tok-variableName">start</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">end</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">above</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">dom</span> <span class="tok-operator">=</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createElement</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;div&quot;</span><span class="tok-punctuation">)</span>
+      <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">textContent</span> <span class="tok-operator">=</span> <span class="tok-variableName">text</span><span class="tok-operator">.</span><span class="tok-propertyName">slice</span><span class="tok-punctuation">(</span><span class="tok-variableName">start</span> <span class="tok-operator">-</span> <span class="tok-variableName">from</span><span class="tok-punctuation">,</span> <span class="tok-variableName">end</span> <span class="tok-operator">-</span> <span class="tok-variableName">from</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">dom</span><span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The function crudely determines the word boundaries around the given
+position and, if the pointer is inside that word, returns a tooltip
+with the word. The <code>end</code> field is used to determine the range that the
+pointer can move over without closing the tooltip. This can be useful
+when the tooltip contains controls that the user can interact with—the
+tooltip shouldn't close when the pointer is moving towards such
+controls.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/tooltip/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:20 GMT -->
+</html>

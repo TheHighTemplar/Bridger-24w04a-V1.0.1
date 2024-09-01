@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/lang-package/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:13 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Language Package Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-writing-a-language-package" tabindex="-1">Example: Writing a Language Package</h1>
+<p>Language support in CodeMirror takes the form of specific packages
+(with names like <code>@codemirror/lang-python</code> or
+<code>codemirror-lang-elixir</code>) that implement the support features for
+working with that language. Those may be...</p>
+<ul>
+<li>
+<p>A parser for the language.</p>
+</li>
+<li>
+<p>Additional syntax-related metadata, such as highlighting,
+indentation, and folding information.</p>
+</li>
+<li>
+<p>Optionally various language-specific extensions and commands, such
+as autocompletion support or language-specific keybindings.</p>
+</li>
+</ul>
+<p>In this example, we'll go through implementing a language package for
+a very minimal Lisp-like language. A similar project, with build tool
+configuration and such set up for you, is available as an example Git
+repository at
+<a href="https://github.com/codemirror/lang-example">codemirror/lang-example</a>.
+It may be useful to start from that when building your own package.</p>
+<h2 id="parsing" tabindex="-1">Parsing</h2>
+<p>The first thing we'll need is a parser, which is used for
+<a href="../../docs/ref/index.html#language.HighlightStyle">highlighting</a> but also provides the
+structure for things like <a href="../../docs/ref/index.html#commands.selectParentSyntax">syntax-aware
+selection</a>,
+<a href="../../docs/ref/index.html#commands.insertNewlineAndIndent">auto-indentation</a>, and <a href="../../docs/ref/index.html#h_folding">code
+folding</a>. There are several ways to implement a parser
+for CodeMirror.</p>
+<ul>
+<li>
+<p>Using a <a href="https://lezer.codemirror.net/">Lezer</a> grammar. This is a
+parser generator system that converts a declarative description of
+a grammar into an efficient parser. It's what we'll be using in
+this example.</p>
+</li>
+<li>
+<p>Using a CodeMirror 5-style <a href="../../docs/ref/index.html#language.StreamParser">stream
+parser</a>, which is mostly just a tokenizer.
+This can be easier for very basic highlighting, but doesn't produce
+a structured syntax tree, and quickly breaks down when you need
+more than tokenizing, for example to distinguish type names from
+variable names.</p>
+</li>
+<li>
+<p>Writing a completely custom parser. This can be the only recourse
+for some awkward languages like
+<a href="https://github.com/codemirror/lang-markdown">Markdown</a>, but tends
+to be quite a lot of work.</p>
+</li>
+</ul>
+<p>Generally, it won't be feasible to use existing parsers, written for a
+different purpose, to parse editor content. The way the editor parses
+code needs to be incremental, so that it can quickly update its parse
+when the document changes, without re-parsing the entire text. It also
+needs to be error-tolerant, so that highlighting doesn't break when
+you have a syntax error somewhere in your file. And finally, it is
+practical when it produces a syntax tree in a
+<a href="https://lezer.codemirror.net/docs/ref/#common.Tree">format</a> that the
+highlighter can consume. Very few existing parsers can easily be
+integrated in such a context.</p>
+<p>If your language defines a formal <a href="https://en.wikipedia.org/wiki/Context-free_language">context-free
+grammar</a>, you may
+be able to base a Lezer grammar on that with relative ease—depending
+on how much dodgy tricks the language uses. Almost all languages do
+some things that don't fit the context-free formalism, but Lezer has
+some mechanisms to deal with that.</p>
+<p>The Lezer
+<a href="https://lezer.codemirror.net/docs/guide/#writing-a-grammar">guide</a>
+provides a more complete explanation of how to write a grammar. But
+roughly, the way it works is that you declare a number of tokens,
+which describe the way the document is split into meaningful pieces
+(identifiers, strings, comments, braces, and so on), and then provide
+rules that describe bigger constructs in term of those tokens and
+other rules.</p>
+<p>The notation borrows from extended Backus-Naur notation and regular
+expression syntax, using <code>|</code> to indicate a choice between several
+forms, <code>*</code> and <code>+</code> for repetition, and <code>?</code> for optional elements.</p>
+<p>The grammar should be put in its own file, typically with a <code>.grammar</code>
+extension, and ran through
+<a href="https://lezer.codemirror.net/docs/guide/#building-a-grammar">lezer-generator</a>
+to create a JavaScript file.</p>
+<p>To learn how to write a Lezer grammar, see the
+<a href="https://lezer.codemirror.net/examples/">examples</a> on the project
+website.</p>
+<p>If your grammar lives in <code>example.grammar</code>, you can run
+<code>lezer-generator example.grammar</code> to create a JavaScript module
+holding the parse tables. Or, as the <a href="https://github.com/codemirror/lang-example">example
+repository</a> does, include
+the <a href="https://rollupjs.org/">Rollup</a> plugin provided by that tool in
+your build process, so that you can directly import the parser from
+the grammar file.</p>
+<h2 id="codemirror-integration" tabindex="-1">CodeMirror integration</h2>
+<p>Lezer is a generic parser tool, and our grammar so far doesn't know
+anything about highlighting or other editor-related functionality.</p>
+<p>A Lezer parser comes with a number of <a href="https://lezer.codemirror.net/docs/ref/#common.NodeType">node
+types</a>, each of
+which can have
+<a href="https://lezer.codemirror.net/docs/ref/#common.NodeProp">props</a> with
+extra metadata added to them. We'll create an extended copy of the
+parser to include node-specific information for highlighting,
+indentation, and folding.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">parser</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;./parser.js&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">foldNodeProp</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">foldInside</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">indentNodeProp</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">styleTags</span><span class="tok-punctuation">,</span> <span class="tok-variableName">tags</span> <span class="tok-keyword">as</span> <span class="tok-variableName tok-definition">t</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@lezer/highlight&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">parserWithMetadata</span> <span class="tok-operator">=</span> <span class="tok-variableName">parser</span><span class="tok-operator">.</span><span class="tok-propertyName">configure</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">props</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">styleTags</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">Identifier</span><span class="tok-punctuation">:</span> <span class="tok-variableName">t</span><span class="tok-operator">.</span><span class="tok-propertyName">variableName</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">Boolean</span><span class="tok-punctuation">:</span> <span class="tok-variableName">t</span><span class="tok-operator">.</span><span class="tok-propertyName">bool</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">String</span><span class="tok-punctuation">:</span> <span class="tok-variableName">t</span><span class="tok-operator">.</span><span class="tok-propertyName">string</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">LineComment</span><span class="tok-punctuation">:</span> <span class="tok-variableName">t</span><span class="tok-operator">.</span><span class="tok-propertyName">lineComment</span><span class="tok-punctuation">,</span>
+      <span class="tok-string">&quot;( )&quot;</span><span class="tok-punctuation">:</span> <span class="tok-variableName">t</span><span class="tok-operator">.</span><span class="tok-propertyName">paren</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">indentNodeProp</span><span class="tok-operator">.</span><span class="tok-propertyName">add</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">Application</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">context</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">context</span><span class="tok-operator">.</span><span class="tok-propertyName">column</span><span class="tok-punctuation">(</span><span class="tok-variableName">context</span><span class="tok-operator">.</span><span class="tok-propertyName">node</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">)</span> <span class="tok-operator">+</span> <span class="tok-variableName">context</span><span class="tok-operator">.</span><span class="tok-propertyName">unit</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">foldNodeProp</span><span class="tok-operator">.</span><span class="tok-propertyName">add</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">Application</span><span class="tok-punctuation">:</span> <span class="tok-variableName">foldInside</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p><a href="https://lezer.codemirror.net/docs/ref/#highlight.styleTags"><code>styleTags</code></a>
+is a helper that attaches highlighting information. We give it an
+object mapping node names (or space-separated lists of node names) to
+<a href="https://lezer.codemirror.net/docs/ref/#highlight.tags">highlighting
+tags</a>. These
+tags describe the syntactic role of the elements, and are used by
+<a href="../../docs/ref/index.html#language.HighlightStyle">highlighters</a> to style the text.</p>
+<p>The information added by <code>@detectDelim</code> would already allow the
+automatic indentation to do a reasonable job, but because Lisps tend
+to indent continued lists one unit beyond the start of the list, and
+the default behavior is similar to how you'd indent parenthesized
+things in C or JavaScript, we'll have to override it.</p>
+<p>The <a href="../../docs/ref/index.html#language.indentNodeProp"><code>indentNodeProp</code></a> prop associates
+functions that compute an indentation with node types. The function is
+passed a <a href="../../docs/ref/index.html#language.TreeIndentContext">context object</a> holding the
+relevant values and some indentation-related helper methods. In this
+case, the function computes the column position at the start of the
+application node and adds one <a href="../../docs/ref/index.html#language.indentUnit">indent unit</a> to
+that. The <a href="../../docs/ref/index.html#language">language package</a> exports a number of helpers
+to easily implement common indentation styles.</p>
+<p>Finally, <a href="../../docs/ref/index.html#language.foldNodeProp"><code>foldNodeProp</code></a> associates folding
+information with node types. We allow application nodes to be folded
+by hiding everything but their delimiters.</p>
+<p>That gives us a parser with enough editor-specific information encoded
+in its output to use it for editing. Next we wrap that in a
+<a href="../../docs/ref/index.html#language.Language"><code>Language</code></a> instance, which wraps a parser and
+adds a language-specific <a href="../../docs/ref/index.html#state.Facet">facet</a> that can be used by
+external code to register language-specific metadata.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">LRLanguage</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">exampleLanguage</span> <span class="tok-operator">=</span> <span class="tok-variableName">LRLanguage</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">parser</span><span class="tok-punctuation">:</span> <span class="tok-variableName">parserWithMetadata</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">languageData</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">commentTokens</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">line</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;;&quot;</span><span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>That code provides one piece of metadata (line comment syntax) right
+away, and allows us to do something like this to add additional
+information, such as the an <a href="../../docs/ref/index.html#autocomplete.CompletionSource">autocompletion
+source</a> for this language.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">completeFromList</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/autocomplete&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">exampleCompletion</span> <span class="tok-operator">=</span> <span class="tok-variableName">exampleLanguage</span><span class="tok-operator">.</span><span class="tok-propertyName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">autocomplete</span><span class="tok-punctuation">:</span> <span class="tok-variableName">completeFromList</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span>
+    <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">label</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;defun&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;keyword&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+    <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">label</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;defvar&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;keyword&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+    <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">label</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;let&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;keyword&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+    <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">label</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;cons&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;function&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+    <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">label</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;car&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;function&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+    <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">label</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;cdr&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;function&quot;</span><span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Finally, it is convention for language packages to export a main
+function (named after the language, so it's called <code>css</code> in
+<code>@codemirror/lang-css</code> for example) that takes a configuration object
+(if the language has anything to configure) and returns a
+<a href="../../docs/ref/index.html#language.LanguageSupport"><code>LanguageSupport</code></a> object, which bundles
+a <code>Language</code> instance with any additional supporting extensions that
+one might want to enable for the language.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">LanguageSupport</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">example</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-keyword">new</span> <span class="tok-variableName">LanguageSupport</span><span class="tok-punctuation">(</span><span class="tok-variableName">exampleLanguage</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">[</span><span class="tok-variableName">exampleCompletion</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>The result looks like this:</p>
+<div id=editor></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="index.js"></script>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/lang-package/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:13 GMT -->
+</html>

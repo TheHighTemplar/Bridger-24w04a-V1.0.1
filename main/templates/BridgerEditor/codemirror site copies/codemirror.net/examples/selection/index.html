@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/selection/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:17 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Selection Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-selection" tabindex="-1">Example: Selection</h1>
+<p>The editor's state always holds at least one selection range. When
+<a href="../../docs/ref/index.html#state.EditorState%5EallowMultipleSelections">multiple
+selections</a>
+are enabled, it may have several.</p>
+<p>Ranges consist of an <em>anchor</em> (the side that doesn't move when you
+shift-select) and a <em>head</em> (the moving side). When those are the same,
+it is a cursor selection, otherwise it is a range.</p>
+<p>When there are multiple selection ranges, one of them will be considered
+the <em>main</em> range (this is also the one that the native selection will
+reflect). If you have an editor state, you can find the main selection
+range with <code>state.selection.main</code>. It is a
+<a href="../../docs/ref/index.html#state.SelectionRange"><code>SelectionRange</code></a> object with <code>anchor</code> and
+<code>head</code> properties (and also <code>from</code>/<code>to</code> if you're interested in the
+minimum or maximum side) holding document positions.</p>
+<p>Like any editor state change, moving the selection is done by
+dispatching a transaction. For example, this moves the cursor to the
+start of the document:</p>
+<pre><code class="language-javascript"><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">anchor</span><span class="tok-punctuation">:</span> <span class="tok-number">0</span><span class="tok-punctuation">}</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The <a href="../../docs/ref/index.html#state.TransactionSpec.selection"><code>selection</code></a> property on a
+transaction spec takes either a shorthand <code>{anchor: number, head?: number}</code> object, or a full
+<a href="../../docs/ref/index.html#state.EditorSelection"><code>EditorSelection</code></a> instance.</p>
+<p>This code creates two selection ranges selecting the 4th and 6th
+character in the editor, and a cursor selection at 8. It makes the
+second range the primary one.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-variableName">EditorSelection</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span>
+    <span class="tok-variableName">EditorSelection</span><span class="tok-operator">.</span><span class="tok-propertyName">range</span><span class="tok-punctuation">(</span><span class="tok-number">4</span><span class="tok-punctuation">,</span> <span class="tok-number">5</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">EditorSelection</span><span class="tok-operator">.</span><span class="tok-propertyName">range</span><span class="tok-punctuation">(</span><span class="tok-number">6</span><span class="tok-punctuation">,</span> <span class="tok-number">7</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">EditorSelection</span><span class="tok-operator">.</span><span class="tok-propertyName">cursor</span><span class="tok-punctuation">(</span><span class="tok-number">8</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span><span class="tok-punctuation">,</span> <span class="tok-number">1</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>When a transaction makes a document change as well as setting the
+selection, the new selection should point into the document as it is
+<em>after</em> the change. For example, here's how you could insert an
+asterisk at position 10 and then put the cursor after it.</p>
+<pre><code class="language-javascript"><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-number">10</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">insert</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;*&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">selection</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">anchor</span><span class="tok-punctuation">:</span> <span class="tok-number">11</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>When writing commands that act on the selection, you have to take some
+care to support multiple ranges. Helper methods like
+<a href="../../docs/ref/index.html#state.EditorState.replaceSelection"><code>replaceSelection</code></a> (which
+replaces all ranges with the same text) and
+<a href="../../docs/ref/index.html#state.EditorState.changeByRange"><code>changeByRange</code></a> (which allows you
+to specify changes per range and merges them into a single transaction
+spec) can be useful.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/selection/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:17 GMT -->
+</html>

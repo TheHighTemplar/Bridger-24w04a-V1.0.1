@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/collab/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:15 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Collaborative Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-collaborative-editing" tabindex="-1">Example: Collaborative Editing</h1>
+<p>Real-time collaborative editing is a technique where multiple people
+on different machines can edit the same document at the same time.
+Changes are propagated to other participants over the network and show
+up in their views of the document as soon as they arrive.</p>
+<p>Here's a toy collaborative editing setup that lives within this page:</p>
+<style>
+  #server {
+    width: max-content;
+    padding: 2px 13px;
+    background: #85a;
+    color: white;
+    border-radius: 8px;
+  }
+  #server select, #server button {
+    border: 1px solid white;
+    border-radius: 3px;
+    color: white;
+    font: inherit;
+    background: inherit;
+  }
+  #latency option {
+    background: #85a;
+  }
+  #editors {
+    padding-top: 10px;
+    overflow: hidden;
+  }
+  .editor {
+    margin-top: 10px;
+    padding-left: 80px;
+    position: relative;
+  }
+  .editor:before {
+    position: absolute;
+    left: 10px; top: -1000px; bottom: calc(100% - 13px); width: 80px;
+    border-left: 5px solid #85a;
+    border-bottom: 5px solid #85a;
+    border-radius: 0 0 0 18px;
+    content: "";
+    pointer-events: none;
+  }
+  .editor.cut:before {
+    width: 40px;
+  }
+  .cut-control {
+    position: absolute;
+    left: 35px; top: 15px;
+  }
+  .cm-editor {
+    border: 3px solid #85a;
+    border-radius: 2px;
+  }
+  .cm-editor .cm-scroller {
+    height: 70px;
+  }
+</style>
+<div id=server>
+  <span style="font-size: 150%; font-weight: bold">Server</span>
+  <label style="margin-left: 1em">Latency ≈ <select id=latency>
+    <option value=10>10ms</option>
+    <option value=50 selected>50ms</option>
+    <option value=250>250ms</option>
+  </select></label>
+  <button id=addpeer style="margin-left: 1em">Add peer</button>
+</div>
+<div id=editors></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="collab.js"></script>
+<p>The main difficulty with this style of editing is handling of
+conflicting edits—since network communication isn't instantaneous, it
+is possible for people to make changes at the same time, which have to
+be reconciled in some way when synchronizing everybody up again.</p>
+<p>CodeMirror comes with utilities for collaborative editing based on
+<a href="https://en.wikipedia.org/wiki/Operational_transformation">operational
+transformation</a>
+with a central authority (server) that assigns a definite order to the
+changes. This example describes the practical information you need to
+set up such a system. For more theoretical information, see <a href="https://marijnhaverbeke.nl/blog/collaborative-editing-cm.html">this blog
+post</a>.</p>
+<p>(It is also possible to wire up different collaborative editing
+algorithms to CodeMirror. See for example
+<a href="https://github.com/yjs/y-codemirror.next">Yjs</a>.)</p>
+<h2 id="principles" tabindex="-1">Principles</h2>
+<p>Collaborative systems implemented with the
+<a href="../../docs/ref/index.html#collab">@codemirror/collab</a> package work like this:</p>
+<ul>
+<li>
+<p>There is a central system (authority) that builds up a history of
+changes.</p>
+</li>
+<li>
+<p>Individual editors (peers) track which version of the authority's
+history they have synchronized with, and which local (unconfirmed)
+changes they have made on top of that.</p>
+</li>
+<li>
+<p>All peers set up some way to receive new changes from the
+authority. When changes come in...</p>
+<ul>
+<li>
+<p>If some of those changes are the peer's own changes, those
+changes are removed from the list of unconfirmed changes.</p>
+</li>
+<li>
+<p>Remote changes are applied to the local editor state.</p>
+</li>
+<li>
+<p>If there are unconfirmed changes present, operational
+transformation is used to transpose the remote changes across
+the unconfirmed local ones, and vice versa, so that the remote
+changes can be applied to the peer's current document, and the
+updated local changes can be submitted to the server as if they
+came after the remote changes.</p>
+</li>
+<li>
+<p>The peer's document version is moved forward.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Whenever there are unconfirmed local changes, the peer should try
+to send them to the authority, along with its current synchronized
+version.</p>
+<ul>
+<li>
+<p>If that version matches the server's version, the server
+accepts the changes as-is and adds them to its history.</p>
+</li>
+<li>
+<p>Otherwise, the server can, depending on how complex it is and on
+whether it has access to all the changes that happened since the
+client's version, either reject the updates, or
+<a href="../../docs/ref/index.html#collab.rebaseUpdates">rebase</a> and accept them.</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>The more tricky logic that a peer must apply is implemented in the
+@codemirror/collab package, but to set up a collaborative system you
+must implement the authority (which can be very simple) and wire up
+the communication between the peers and the authority (which can get a
+bit more subtle due to the nature of networked/asynchronous systems).</p>
+<h2 id="the-authority" tabindex="-1">The Authority</h2>
+<p>In this example, the authority is a <a href="https://developer.mozilla.org/en-US/docs/Web/API/Worker">web
+worker</a>. That
+helps simulate the asynchronous nature of communication, and the need
+to serialize data that goes over the communication channel, while
+still allowing everything to run inside the browser. In the real
+world, it'll typically be a server program communicating with peers
+using HTTP requests or
+<a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API">websockets</a>.</p>
+<p>Error handling will be omitted throughout the example to keep things
+concise.</p>
+<p>The state kept by the authority is just an array of updates (holding a
+<a href="../../docs/ref/index.html#state.ChangeSet">change set</a> and a client ID), and a current
+document.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">ChangeSet</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Text</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Update</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">rebaseUpdates</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/collab&quot;</span>
+
+<span class="tok-comment">// The updates received so far (updates.length gives the current</span>
+<span class="tok-comment">// version)</span>
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">updates</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Update</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>
+<span class="tok-comment">// The current document</span>
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">doc</span> <span class="tok-operator">=</span> <span class="tok-variableName">Text</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span><span class="tok-string">&quot;Start document&quot;</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The document is used by new peers to be able to join the session—they
+must ask the authority for a starting document and version before they
+are able to participate.</p>
+<p>This code implements the three message types that the worker handles.</p>
+<ul>
+<li>
+<p><strong><code>pullUpdates</code></strong> is used to ask the authority if any new updates
+have come in since a given document version. It “blocks” until new
+changes come in when asked for the current version (this is what
+the <code>pending</code> variable is used for).</p>
+</li>
+<li>
+<p><strong><code>pushUpdates</code></strong> is used to send an array of updates. The server
+stores the updates, rolls its document forward, and notifies any
+waiting <code>pullUpdates</code> requests.</p>
+</li>
+<li>
+<p><strong><code>getDocument</code></strong> is used by new peers to retrieve a starting
+state.</p>
+</li>
+</ul>
+<p>We'll use a crude mechanism based on
+<a href="https://developer.mozilla.org/en-US/docs/Web/API/Worker/postMessage"><code>postMessage</code></a>
+and <a href="https://developer.mozilla.org/en-US/docs/Web/API/MessageChannel">message
+channels</a>
+to communicate between the main page and the worker. Feel free to
+ignore the message-channel-related code in <code>resp</code>, since that's not
+terribly relevant here.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">pending</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">value</span><span class="tok-punctuation">:</span> <span class="tok-typeName">any</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-keyword">void</span><span class="tok-punctuation">)</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>
+
+<span class="tok-variableName">self</span><span class="tok-operator">.</span><span class="tok-propertyName">onmessage</span> <span class="tok-operator">=</span> <span class="tok-variableName tok-definition">event</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">resp</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">value</span><span class="tok-punctuation">:</span> <span class="tok-typeName">any</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">event</span><span class="tok-operator">.</span><span class="tok-propertyName">ports</span><span class="tok-punctuation">[</span><span class="tok-number">0</span><span class="tok-punctuation">]</span><span class="tok-operator">.</span><span class="tok-propertyName">postMessage</span><span class="tok-punctuation">(</span><span class="tok-variableName">JSON</span><span class="tok-operator">.</span><span class="tok-propertyName">stringify</span><span class="tok-punctuation">(</span><span class="tok-variableName">value</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">data</span> <span class="tok-operator">=</span> <span class="tok-variableName">JSON</span><span class="tok-operator">.</span><span class="tok-propertyName">parse</span><span class="tok-punctuation">(</span><span class="tok-variableName">event</span><span class="tok-operator">.</span><span class="tok-propertyName">data</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">type</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;pullUpdates&quot;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">version</span> <span class="tok-operator">&lt;</span> <span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span>
+      <span class="tok-variableName">resp</span><span class="tok-punctuation">(</span><span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">slice</span><span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">version</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">else</span>
+      <span class="tok-variableName">pending</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-variableName">resp</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span> <span class="tok-keyword">else</span> <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">type</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;pushUpdates&quot;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-comment">// Convert the JSON representation to an actual ChangeSet</span>
+    <span class="tok-comment">// instance</span>
+    <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">received</span> <span class="tok-operator">=</span> <span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">json</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">clientID</span><span class="tok-punctuation">:</span> <span class="tok-variableName">json</span><span class="tok-operator">.</span><span class="tok-propertyName">clientID</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-variableName">ChangeSet</span><span class="tok-operator">.</span><span class="tok-propertyName">fromJSON</span><span class="tok-punctuation">(</span><span class="tok-variableName">json</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">version</span> <span class="tok-operator">!=</span> <span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span>
+      <span class="tok-variableName">received</span> <span class="tok-operator">=</span> <span class="tok-variableName">rebaseUpdates</span><span class="tok-punctuation">(</span><span class="tok-variableName">received</span><span class="tok-punctuation">,</span> <span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">slice</span><span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">version</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">update</span> <span class="tok-keyword">of</span> <span class="tok-variableName">received</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-punctuation">)</span>
+      <span class="tok-variableName">doc</span> <span class="tok-operator">=</span> <span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-operator">.</span><span class="tok-propertyName">apply</span><span class="tok-punctuation">(</span><span class="tok-variableName">doc</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+    <span class="tok-variableName">resp</span><span class="tok-punctuation">(</span><span class="tok-bool">true</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">received</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-comment">// Notify pending requests</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">json</span> <span class="tok-operator">=</span> <span class="tok-variableName">received</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">update</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+        <span class="tok-propertyName tok-definition">clientID</span><span class="tok-punctuation">:</span> <span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">clientID</span><span class="tok-punctuation">,</span>
+        <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-operator">.</span><span class="tok-propertyName">toJSON</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+      <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">while</span> <span class="tok-punctuation">(</span><span class="tok-variableName">pending</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span> <span class="tok-variableName">pending</span><span class="tok-operator">.</span><span class="tok-propertyName">pop</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-operator">!</span><span class="tok-punctuation">(</span><span class="tok-variableName">json</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span> <span class="tok-keyword">else</span> <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">type</span> <span class="tok-operator">==</span> <span class="tok-string">&quot;getDocument&quot;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">resp</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">version</span><span class="tok-punctuation">:</span> <span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-variableName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">toString</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>In older versions of @codemirror/collab,
+<a href="../../docs/ref/index.html#collab.rebaseUpdates"><code>rebaseUpdates</code></a> didn't exist the way to
+handle updates where the client's version didn't match the server's
+document version was to simply reject them. The client would have to
+fetch peer updates and try again.</p>
+<p>This is still a reasonable way to implement the protocol, but it can
+in some circumstances lead to <em>starvation</em>—if a client has a higher
+latency than its peers, and those peers keep submitting changes, it
+may be unable to get its updates through for a long time, as they keep
+getting rejected. Thus, it is recommended to rebase updates whenever
+practical. If you don't store the full history of updates, but only
+recent ones, it is still reasonable to reject requests with a version
+that you don't have the update objects for anymore.</p>
+<h2 id="the-peer" tabindex="-1">The Peer</h2>
+<p>On the other side of the connection, I'm using some messy magic code
+to introduce fake latency and broken connections (the scissor controls
+in the demo above). This isn't very interesting, so I'm hiding it in a
+<code>Connection</code> class which is omitted from the code below (you can find
+the full code on
+<a href="https://github.com/codemirror/website/tree/master/site/examples/collab/collab.ts">GitHub</a>).</p>
+<p>These wrappers interact with the worker process through messages,
+returning a promise that eventually resolves with some result (when
+the connection is cut, the promises will just hang until it is
+reestablished).</p>
+<pre><code class="language-typescript"><span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">pushUpdates</span><span class="tok-punctuation">(</span>
+  <span class="tok-variableName tok-definition">connection</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Connection</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName tok-definition">version</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName tok-definition">fullUpdates</span><span class="tok-punctuation">:</span> <span class="tok-keyword">readonly</span> <span class="tok-typeName">Update</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>
+<span class="tok-punctuation">)</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Promise</span>&lt;<span class="tok-typeName">boolean</span>&gt; <span class="tok-punctuation">{</span>
+  <span class="tok-comment">// Strip off transaction data</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">updates</span> <span class="tok-operator">=</span> <span class="tok-variableName">fullUpdates</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">u</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">clientID</span><span class="tok-punctuation">:</span> <span class="tok-variableName">u</span><span class="tok-operator">.</span><span class="tok-propertyName">clientID</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-variableName">u</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-operator">.</span><span class="tok-propertyName">toJSON</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">connection</span><span class="tok-operator">.</span><span class="tok-propertyName">request</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;pushUpdates&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">version</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">updates</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">pullUpdates</span><span class="tok-punctuation">(</span>
+  <span class="tok-variableName tok-definition">connection</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Connection</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName tok-definition">version</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span>
+<span class="tok-punctuation">)</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Promise</span>&lt;<span class="tok-keyword">readonly</span> <span class="tok-typeName">Update</span><span class="tok-punctuation">[</span><span class="tok-punctuation">]</span>&gt; <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">connection</span><span class="tok-operator">.</span><span class="tok-propertyName">request</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;pullUpdates&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">version</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+    <span class="tok-operator">.</span><span class="tok-propertyName">then</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">updates</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">u</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">changes</span><span class="tok-punctuation">:</span> <span class="tok-variableName">ChangeSet</span><span class="tok-operator">.</span><span class="tok-propertyName">fromJSON</span><span class="tok-punctuation">(</span><span class="tok-variableName">u</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">clientID</span><span class="tok-punctuation">:</span> <span class="tok-variableName">u</span><span class="tok-operator">.</span><span class="tok-propertyName">clientID</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">getDocument</span><span class="tok-punctuation">(</span>
+  <span class="tok-variableName tok-definition">connection</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Connection</span>
+<span class="tok-punctuation">)</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Promise</span>&lt;<span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">version</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Text</span><span class="tok-punctuation">}</span>&gt; <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">connection</span><span class="tok-operator">.</span><span class="tok-propertyName">request</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">type</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;getDocument&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">then</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">data</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">version</span><span class="tok-punctuation">:</span> <span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">version</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-variableName">Text</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">data</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">split</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;</span><span class="tok-string2">\n</span><span class="tok-string">&quot;</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>To manage the communication with the authority, we use a <a href="../../docs/ref/index.html#view.ViewPlugin">view
+plugin</a> (which are almost always the right place
+for asynchronous logic in CodeMirror). This plugin will constantly (in
+an async loop) try to pull in new updates and, if it gets them, apply
+them to the editor using the
+<a href="../../docs/ref/index.html#collab.receiveUpdates"><code>receiveUpdates</code></a> function.</p>
+<p>When the content of the editor changes, the plugin starts trying to
+push its local updates. It keeps a field to make sure it only has one
+running push request, and crudely sets a timeout to retry pushing when
+there are still unconfirmed changes after the request. This can happen
+when the push failed or new changes were introduced while it was in
+progress.</p>
+<p>(The request scheduling is something you'll <em>definitely</em> want to do in
+a more elaborate way in a real setup. It can help to include both
+pushing and pulling in a single state machine, where the peer only
+does one of the two at a time.)</p>
+<p>The <code>peerExtension</code> function returns such a plugin plus a <code>collab</code>
+extension configured with the appropriate start version.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">peerExtension</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">startVersion</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">connection</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Connection</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">plugin</span> <span class="tok-operator">=</span> <span class="tok-variableName">ViewPlugin</span><span class="tok-operator">.</span><span class="tok-propertyName">fromClass</span><span class="tok-punctuation">(</span><span class="tok-keyword">class</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">private</span> <span class="tok-propertyName tok-definition">pushing</span> <span class="tok-operator">=</span> <span class="tok-bool">false</span>
+    <span class="tok-keyword">private</span> <span class="tok-propertyName tok-definition">done</span> <span class="tok-operator">=</span> <span class="tok-bool">false</span>
+
+    <span class="tok-propertyName tok-definition">constructor</span><span class="tok-punctuation">(</span><span class="tok-keyword">private</span> <span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">pull</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">}</span>
+
+    <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">update</span><span class="tok-punctuation">:</span> <span class="tok-typeName">ViewUpdate</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">docChanged</span><span class="tok-punctuation">)</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+
+    <span class="tok-keyword">async</span> <span class="tok-propertyName tok-definition">push</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">updates</span> <span class="tok-operator">=</span> <span class="tok-variableName">sendableUpdates</span><span class="tok-punctuation">(</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">pushing</span> <span class="tok-operator">||</span> <span class="tok-operator">!</span><span class="tok-variableName">updates</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span> <span class="tok-keyword">return</span>
+      <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">pushing</span> <span class="tok-operator">=</span> <span class="tok-bool">true</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">version</span> <span class="tok-operator">=</span> <span class="tok-variableName">getSyncedVersion</span><span class="tok-punctuation">(</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">await</span> <span class="tok-variableName">pushUpdates</span><span class="tok-punctuation">(</span><span class="tok-variableName">connection</span><span class="tok-punctuation">,</span> <span class="tok-variableName">version</span><span class="tok-punctuation">,</span> <span class="tok-variableName">updates</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">pushing</span> <span class="tok-operator">=</span> <span class="tok-bool">false</span>
+      <span class="tok-comment">// Regardless of whether the push failed or new updates came in</span>
+      <span class="tok-comment">// while it was running, try again if there's updates remaining</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">sendableUpdates</span><span class="tok-punctuation">(</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">)</span>
+        <span class="tok-variableName">setTimeout</span><span class="tok-punctuation">(</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">push</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-number">100</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+
+    <span class="tok-keyword">async</span> <span class="tok-propertyName tok-definition">pull</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">while</span> <span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">done</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+        <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">version</span> <span class="tok-operator">=</span> <span class="tok-variableName">getSyncedVersion</span><span class="tok-punctuation">(</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">)</span>
+        <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">updates</span> <span class="tok-operator">=</span> <span class="tok-keyword">await</span> <span class="tok-variableName">pullUpdates</span><span class="tok-punctuation">(</span><span class="tok-variableName">connection</span><span class="tok-punctuation">,</span> <span class="tok-variableName">version</span><span class="tok-punctuation">)</span>
+        <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-variableName">receiveUpdates</span><span class="tok-punctuation">(</span><span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-punctuation">,</span> <span class="tok-variableName">updates</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+      <span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">}</span>
+
+    <span class="tok-propertyName tok-definition">destroy</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">this</span><span class="tok-operator">.</span><span class="tok-propertyName">done</span> <span class="tok-operator">=</span> <span class="tok-bool">true</span> <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">[</span><span class="tok-variableName">collab</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">startVersion</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-variableName">plugin</span><span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Now you can create a wired-up editor view with code like this.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">async</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">createPeer</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">connection</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Connection</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-punctuation">{</span><span class="tok-propertyName">version</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">doc</span><span class="tok-punctuation">}</span> <span class="tok-operator">=</span> <span class="tok-keyword">await</span> <span class="tok-variableName">getDocument</span><span class="tok-punctuation">(</span><span class="tok-variableName">connection</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">state</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorState</span><span class="tok-operator">.</span><span class="tok-propertyName">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">doc</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">extensions</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span><span class="tok-variableName">basicSetup</span><span class="tok-punctuation">,</span> <span class="tok-variableName">peerExtension</span><span class="tok-punctuation">(</span><span class="tok-variableName">version</span><span class="tok-punctuation">,</span> <span class="tok-variableName">connection</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-keyword">new</span> <span class="tok-variableName">EditorView</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">state</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<h2 id="dropping-old-updates" tabindex="-1">Dropping Old Updates</h2>
+<p>This implementation endlessly accumulates updates for every single
+change made in the editors.</p>
+<p>This can be okay, or even useful, since it provides a detailed history
+of how the document was written (especially if you add additional data
+like timestamps and user identifiers).</p>
+<p>But when you don't want or need it, it is possible to, at some point,
+start dropping old updates. The downside of this is that it will no
+longer be possible for peers that have been offline since those
+updates were made to resynchronize with the authority. They will ask
+for all updates since a given version, and that data will no longer be
+available. Depending on the use case and the time period involved,
+this may be acceptable.</p>
+<p>It is also possible to “compress” changes using
+<a href="../../docs/ref/index.html#state.ChangeSet.compose"><code>ChangeSet.compose</code></a> to store a less
+finely grained history. This will still prevent peers from
+synchronizing (when they ask for a version that has been compressed
+away), but when done on old data it can greatly reduce the size of the
+history data.</p>
+<h2 id="shared-effects" tabindex="-1">Shared Effects</h2>
+<p>By default, the only thing that is shared through such a
+collaborative-editing channel is document changes (the <code>changes</code> field
+in the update objects). Sometimes it is useful to also use this
+mechanism to share other information that should be distributed
+between clients.</p>
+<p>To do that, when calling the <a href="../../docs/ref/index.html#collab.collab"><code>collab</code></a> extension
+constructor, you can pass a
+<a href="../../docs/ref/index.html#collab.collab%5Econfig.sharedEffects"><code>sharedEffects</code></a> function which
+produces an array of “shared effects” from a transaction. Shared
+effects are instances of <a href="../../docs/ref/index.html#state.StateEffect"><code>StateEffect</code></a> that
+should be applied in other peers as well. In the simplest case,
+<code>sharedEffects</code> could just filter the transaction's effects, picking
+out specific types of transactions.</p>
+<p>Say, for example, we have a plugin tracking marked regions in the
+document. Editors keep a state field with a collection of marked
+regions, and have a <code>markRegion</code> effect that they use to add regions
+to this.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">StateEffect</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">markRegion</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">}</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">map</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName">to</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">changes</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">from</span> <span class="tok-operator">=</span> <span class="tok-variableName">changes</span><span class="tok-operator">.</span><span class="tok-propertyName">mapPos</span><span class="tok-punctuation">(</span><span class="tok-variableName">from</span><span class="tok-punctuation">,</span> <span class="tok-number">1</span><span class="tok-punctuation">)</span>
+    <span class="tok-variableName">to</span> <span class="tok-operator">=</span> <span class="tok-variableName">changes</span><span class="tok-operator">.</span><span class="tok-propertyName">mapPos</span><span class="tok-punctuation">(</span><span class="tok-variableName">to</span><span class="tok-punctuation">,</span> <span class="tok-operator">-</span><span class="tok-number">1</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">from</span> <span class="tok-operator">&lt;</span> <span class="tok-variableName">to</span> <span class="tok-operator">?</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">from</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">to</span><span class="tok-punctuation">}</span> <span class="tok-operator">:</span> <span class="tok-variableName">undefined</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Since the effect refers to positions in the document, it needs a
+<a href="../../docs/ref/index.html#state.StateEffect%5Edefine%5Espec.map"><code>map</code></a> function to map it
+through document changes. This will also be used by the collab package
+when reconciling local and remote changes.</p>
+<p>Now with a function like this as <code>sharedEffects</code> source, we'd get
+these effects in our <code>Update</code> objects:</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">collab</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/collab&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">markCollab</span> <span class="tok-operator">=</span> <span class="tok-punctuation">{</span>
+  <span class="tok-comment">// ...</span>
+  <span class="tok-propertyName tok-definition">sharedEffects</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">tr</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">effects</span><span class="tok-operator">.</span><span class="tok-propertyName">filter</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">e</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">is</span><span class="tok-punctuation">(</span><span class="tok-variableName">markRegion</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>The library doesn't provide any utilities for serializing effects, so
+in order to send them around as JSON you need your own custom
+serialization code for the <code>effects</code> field in updates.</p>
+<p>But once you set that up, assuming that all peers have some extension
+that handles these effects installed, applying them across peers
+should just work. The effects get applied in transactions created by
+<a href="../../docs/ref/index.html#collab.receiveUpdates"><code>receiveUpdates</code></a>, and the state field that
+manages such marks will pick them up from there.</p>
+<p>There is one thing to keep in mind though. As described in more detail
+in <a href="https://marijnhaverbeke.nl/blog/collaborative-editing-cm.html#position-mapping">the collaborative-editing blog
+post</a>,
+the kind of position mapping done in the effect's <code>map</code> function is
+not guaranteed to converge to the same positions when applied in
+different order by different peers. For some use cases (such as
+showing other people's cursor), this may be harmless. For others, you
+might need to set up a separate mechanism to periodically synchronize
+the positions.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/collab/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:15 GMT -->
+</html>

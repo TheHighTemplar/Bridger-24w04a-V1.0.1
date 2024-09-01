@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/gutter/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:18 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Gutter Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-gutters" tabindex="-1">Example: Gutters</h1>
+<p>The <a href="../../docs/ref/index.html#h_gutters">view module</a> provides functionality for adding
+<em>gutters</em> (vertical bars in front of the code) to your editor. The
+simplest use of gutters is to simply dump
+<a href="../../docs/ref/index.html#view.lineNumbers"><code>lineNumbers()</code></a> into your configuration to
+get a line number gutter. But the module also helps when you want to
+define your own gutters and show custom controls in them.</p>
+<h2 id="adding-a-gutter" tabindex="-1">Adding a Gutter</h2>
+<p>Conceptually, the editor displays a collection of gutters next to each
+other, each of which has its own style and content (though you'll
+often want to keep their default style so that they blend in with the
+others, looking like a single big gutter). For each line, each gutter
+may display something. The line number gutter will show a line
+number—obviously.</p>
+<p>To add a gutter, call the <a href="../../docs/ref/index.html#view.gutter"><code>gutter</code></a> function and
+include the result in your state configuration. The position of this
+extension relative to other gutter extensions determines the ordering
+of the gutters. So this, for example, will put our gutter after the
+line numbers:</p>
+<pre><code>extensions: [lineNumbers(), gutter({class: &quot;cm-mygutter&quot;})]
+</code></pre>
+<p>Unless the <code>cm-mygutter</code> CSS class sets some minimum width, you won't
+see such a gutter though—it'll just be an empty element (in a CSS
+flexbox), which the browser will collapse.</p>
+<p>To put content into the gutter, we can use either the
+<a href="../../docs/ref/index.html#view.gutter%5Econfig.lineMarker"><code>lineMarker</code></a> option, which will be
+called for each visible line to determine what to show there, or the
+<a href="../../docs/ref/index.html#view.gutter%5Econfig.markers"><code>markers</code></a> option, which allows you to
+build a persistent set of markers (using the same <a href="../../docs/ref/index.html#state.RangeSet">range
+set</a> data structure used in
+<a href="../decoration/index.html">decorations</a>) to show in your gutter.</p>
+<p>As with <a href="../../docs/ref/index.html#view.WidgetType">decorations</a>, gutter markers are
+represented by lightweight immutable values that know how to render
+themselves to DOM nodes, in order to allow updates to be represented
+in a declarative way without recreating a lot of DOM nodes on every
+transaction. Gutter markers can also <a href="../../docs/ref/index.html#view.GutterMarker.elementClass">add a CSS
+class</a> to a gutter element.</p>
+<p>This code defines two gutters, one that shows an ø sign on every empty
+line, and one that allows you to toggle a 'breakpoint' marker per line
+by clicking on that gutter. The first is easy:</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">gutter</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">GutterMarker</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">emptyMarker</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-keyword">class</span> <span class="tok-keyword">extends</span> <span class="tok-variableName">GutterMarker</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">toDOM</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">return</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createTextNode</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;ø&quot;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">emptyLineGutter</span> <span class="tok-operator">=</span> <span class="tok-variableName">gutter</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">lineMarker</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">line</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span> <span class="tok-operator">==</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">to</span> <span class="tok-operator">?</span> <span class="tok-variableName">emptyMarker</span> <span class="tok-operator">:</span> <span class="tok-keyword">null</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">initialSpacer</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">emptyMarker</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>(The <code>new class</code> construct creates an anonymous class and then
+initializes a single instance of it. Since there's only one type of
+empty-line marker, we use this to get our <code>GutterMarker</code> instance.)</p>
+<p>To avoid the problem with empty gutters not showing up at all, gutters
+allow you to <a href="../../docs/ref/index.html#view.gutter%5Econfig.initialSpacer">configure</a> a
+'spacer' element that is rendered invisibly in the gutter to set its
+minimal width. This is often easier than setting an explicit with with
+CSS and making sure it covers the expected content.</p>
+<p>The <code>lineMarker</code> option checks if the line is zero-length, and if so,
+returns our marker.</p>
+<p>The breakpoint gutter is a bit more involved. It needs to track state
+(the position of the breakpoints), for which we use a <a href="../../docs/ref/index.html#state.StateField">state
+field</a>, with a <a href="../../docs/ref/index.html#state.StateEffect">state effect</a>
+that can update it.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">StateField</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">StateEffect</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">RangeSet</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">breakpointEffect</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">pos</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">on</span><span class="tok-punctuation">:</span> <span class="tok-typeName">boolean</span><span class="tok-punctuation">}</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">map</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">val</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">mapping</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">pos</span><span class="tok-punctuation">:</span> <span class="tok-variableName">mapping</span><span class="tok-operator">.</span><span class="tok-propertyName">mapPos</span><span class="tok-punctuation">(</span><span class="tok-variableName">val</span><span class="tok-operator">.</span><span class="tok-propertyName">pos</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">on</span><span class="tok-punctuation">:</span> <span class="tok-variableName">val</span><span class="tok-operator">.</span><span class="tok-propertyName">on</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">breakpointState</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateField</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-typeName">RangeSet</span>&lt;<span class="tok-typeName">GutterMarker</span>&gt;&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">return</span> <span class="tok-variableName">RangeSet</span><span class="tok-operator">.</span><span class="tok-propertyName">empty</span> <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">set</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">transaction</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">set</span> <span class="tok-operator">=</span> <span class="tok-variableName">set</span><span class="tok-operator">.</span><span class="tok-propertyName">map</span><span class="tok-punctuation">(</span><span class="tok-variableName">transaction</span><span class="tok-operator">.</span><span class="tok-propertyName">changes</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">e</span> <span class="tok-keyword">of</span> <span class="tok-variableName">transaction</span><span class="tok-operator">.</span><span class="tok-propertyName">effects</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">is</span><span class="tok-punctuation">(</span><span class="tok-variableName">breakpointEffect</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+        <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">on</span><span class="tok-punctuation">)</span>
+          <span class="tok-variableName">set</span> <span class="tok-operator">=</span> <span class="tok-variableName">set</span><span class="tok-operator">.</span><span class="tok-propertyName">update</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">add</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span><span class="tok-variableName">breakpointMarker</span><span class="tok-operator">.</span><span class="tok-propertyName">range</span><span class="tok-punctuation">(</span><span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">pos</span><span class="tok-punctuation">)</span><span class="tok-punctuation">]</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+        <span class="tok-keyword">else</span>
+          <span class="tok-variableName">set</span> <span class="tok-operator">=</span> <span class="tok-variableName">set</span><span class="tok-operator">.</span><span class="tok-propertyName">update</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">filter</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">from</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">from</span> <span class="tok-operator">!=</span> <span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">pos</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+      <span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">}</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">set</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">toggleBreakpoint</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">pos</span><span class="tok-punctuation">:</span> <span class="tok-typeName">number</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">breakpoints</span> <span class="tok-operator">=</span> <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">field</span><span class="tok-punctuation">(</span><span class="tok-variableName">breakpointState</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">hasBreakpoint</span> <span class="tok-operator">=</span> <span class="tok-bool">false</span>
+  <span class="tok-variableName">breakpoints</span><span class="tok-operator">.</span><span class="tok-propertyName">between</span><span class="tok-punctuation">(</span><span class="tok-variableName">pos</span><span class="tok-punctuation">,</span> <span class="tok-variableName">pos</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-punctuation">{</span><span class="tok-variableName">hasBreakpoint</span> <span class="tok-operator">=</span> <span class="tok-bool">true</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">effects</span><span class="tok-punctuation">:</span> <span class="tok-variableName">breakpointEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">pos</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">on</span><span class="tok-punctuation">:</span> <span class="tok-operator">!</span><span class="tok-variableName">hasBreakpoint</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>The state starts empty, and when a transaction happens, it
+<a href="../../docs/ref/index.html#state.ChangeDesc.mapPos">maps</a> the positions of the breakpoints
+through the changes (if any), and looks for effects that add or remove
+breakpoints, adjusting the set of breakpoints as appropriate.</p>
+<p>The <code>breakpointGutter</code> extension combines this state field with a
+gutter and a bit of styling for that gutter.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">breakpointMarker</span> <span class="tok-operator">=</span> <span class="tok-keyword">new</span> <span class="tok-keyword">class</span> <span class="tok-keyword">extends</span> <span class="tok-variableName">GutterMarker</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">toDOM</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span> <span class="tok-keyword">return</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createTextNode</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;💔&quot;</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">breakpointGutter</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span>
+  <span class="tok-variableName">breakpointState</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName">gutter</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">class</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;cm-breakpoint-gutter&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">markers</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">v</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">v</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">field</span><span class="tok-punctuation">(</span><span class="tok-variableName">breakpointState</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">initialSpacer</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">breakpointMarker</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">domEventHandlers</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">mousedown</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">line</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+        <span class="tok-variableName">toggleBreakpoint</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-punctuation">,</span> <span class="tok-variableName">line</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">)</span>
+        <span class="tok-keyword">return</span> <span class="tok-bool">true</span>
+      <span class="tok-punctuation">}</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+  <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">baseTheme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+    <span class="tok-string">&quot;.cm-breakpoint-gutter .cm-gutterElement&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">color</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;red&quot;</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">paddingLeft</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;5px&quot;</span><span class="tok-punctuation">,</span>
+      <span class="tok-propertyName tok-definition">cursor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;default&quot;</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">]</span>
+</code></pre>
+<p>The <a href="../../docs/ref/index.html#view.gutter%5Econfig.domEventHandlers"><code>domEventHandlers</code></a>
+option allows you to specify event handlers for this gutter, which we
+use to set up a mousedown handler to toggle the breakpoint for the
+line that was clicked.</p>
+<p>This is what an editor with the breakpoint gutter before the line
+numbers and the empty line gutter after it looks like:</p>
+<div id="editor"></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="gutters.js"></script>
+<h2 id="customizing-the-line-number-gutter" tabindex="-1">Customizing the Line Number Gutter</h2>
+<p>The <a href="../../docs/ref/index.html#view.lineNumbers"><code>lineNumbers</code></a> function also takes
+configuration parameters, allowing you to add <a href="../../docs/ref/index.html#view.lineNumbers%5Econfig.domEventHandlers">event
+handlers</a> or customize
+the way line numbers are
+<a href="../../docs/ref/index.html#view.lineNumbers%5Econfig.formatNumber">displayed</a>.</p>
+<pre><code>const hexLineNumbers = lineNumbers({
+  formatNumber: n =&gt; n.toString(16)
+})
+</code></pre>
+<p>It is also possible to add markers to the line number gutter, which
+replace the line numbers for affected lines. This is done through the
+<a href="../../docs/ref/index.html#view.lineNumberMarkers"><code>lineNumberMarkers</code></a> facet, which works a
+lot like <code>markers</code> on custom gutters, but can be provided by any
+extension, rather than being configured directly for a single gutter.</p>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/gutter/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:18 GMT -->
+</html>

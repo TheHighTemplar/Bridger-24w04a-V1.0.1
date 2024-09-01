@@ -1,0 +1,78 @@
+<!doctype html>
+
+<title>CodeMirror: Django template mode</title>
+
+<!-- Mirrored from codemirror.net/5/mode/django/index.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:32:35 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset="utf-8"/>
+<link rel=stylesheet href="../../doc/docs.css">
+
+<link rel="stylesheet" href="../../lib/codemirror.css">
+<link rel="stylesheet" href="../../theme/mdn-like.css">
+<script src="../../lib/codemirror.js"></script>
+<script src="../../addon/mode/overlay.js"></script>
+<script src="../xml/xml.js"></script>
+<script src="../htmlmixed/htmlmixed.js"></script>
+<script src="django.js"></script>
+<style>.CodeMirror {border-top: 1px solid black; border-bottom: 1px solid black;}</style>
+<div id=nav>
+  <a href="../../index.html"><h1>CodeMirror</h1><img id=logo src="../../doc/logo.png" alt=""></a>
+
+  <ul>
+    <li><a href="../../index-2.html">Home</a>
+    <li><a href="../../doc/manual.html">Manual</a>
+    <li><a href="https://github.com/codemirror/codemirror5">Code</a>
+  </ul>
+  <ul>
+    <li><a href="../index.html">Language modes</a>
+    <li><a class=active href="#">Django</a>
+  </ul>
+</div>
+
+<article>
+<h2>Django template mode</h2>
+<form><textarea id="code" name="code">
+<!doctype html>
+<html>
+  <head>
+    <title>My Django web application</title>
+  </head>
+  <body>
+    <h1>
+      {{ page.title|capfirst }}
+    </h1>
+    <ul class="my-list">
+      {# traverse a list of items and produce links to their views. #}
+      {% for item in items %}
+      <li>
+        <a href="%7b%25%20url%20%27item_view%27%20item.html">
+          {{ item.name }}
+        </a>
+      </li>
+      {% empty %}
+      <li>You have no items in your list.</li>
+      {% endfor %}
+    </ul>
+    {% comment "this is a forgotten footer" %}
+    <footer></footer>
+    {% endcomment %}
+  </body>
+
+<!-- Mirrored from codemirror.net/5/mode/django/index.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:32:36 GMT -->
+</html>
+</textarea></form>
+
+    <script>
+      var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+        lineNumbers: true,
+        mode: "django",
+        indentUnit: 2,
+        indentWithTabs: true,
+        theme: "mdn-like"
+      });
+    </script>
+
+    <p>Mode for HTML with embedded Django template markup.</p>
+
+    <p><strong>MIME types defined:</strong> <code>text/x-django</code></p>
+  </article>

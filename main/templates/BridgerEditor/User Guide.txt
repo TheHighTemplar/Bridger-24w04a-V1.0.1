@@ -1,0 +1,9 @@
+Thank you to support Bridger and the Bridger tools
+The BridgerEditor is a completely offline-based html file, which means your admin cannot stop you for using this coding platform
+you can download, import, and save on the local storage that will resume when you open it again
+1. Download HTML button : that button will download the html that will contain all your work, the download file will been stored on the default download folder(you can manually set it too)
+2. Import HTML Button : this Button allows you to import a incomplete html, but due to the computer security, we cannot write data directly to the file, so we don't suggest to download a incomplete project
+3.Save Button : The save button will create a little storge, once you press the save button, your saved change will be open even you have restart the service.
+4. Reset All : It will clear all the unsave changes, not include the saved data， reload the page to load the saved data, the new saved data will cover the older one.
+
+The BridgerEditor Support the files which is between 1B to 1GB due to the computer difference, the biggest file have been tested was 36 KB.

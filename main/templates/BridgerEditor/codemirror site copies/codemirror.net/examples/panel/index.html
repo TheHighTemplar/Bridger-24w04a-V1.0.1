@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/panel/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:18 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Panel Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-editor-panels" tabindex="-1">Example: Editor Panels</h1>
+<p>A “panel”, as supported by the <a href="../../docs/ref/index.html#h_panels">@codemirror/view</a> package,
+is a UI element shown above or below the editor. They will sit inside
+the editor's vertical space for editors with fixed height. When the
+editor is partially scrolled out of view, panels will be positioned to
+stay in view.</p>
+<p>This example shows how to add panels to your editor.</p>
+<h2 id="opening-and-closing-panels" tabindex="-1">Opening and Closing Panels</h2>
+<p>The set of panels to show at a given time is determined by the value
+of the <a href="../../docs/ref/index.html#view.showPanel"><code>showPanel</code></a> facet. To track the current
+state of our panel, we define this <a href="../../docs/ref/index.html#state.StateField">state field</a>,
+with an <a href="../../docs/ref/index.html#state.StateEffect">effect</a> to turn it on or off.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">showPanel</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Panel</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">StateField</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">StateEffect</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">toggleHelp</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateEffect</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-typeName">boolean</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">helpPanelState</span> <span class="tok-operator">=</span> <span class="tok-variableName">StateField</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span>&lt;<span class="tok-typeName">boolean</span>&gt;<span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">create</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-bool">false</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">value</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">tr</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">e</span> <span class="tok-keyword">of</span> <span class="tok-variableName">tr</span><span class="tok-operator">.</span><span class="tok-propertyName">effects</span><span class="tok-punctuation">)</span> <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">is</span><span class="tok-punctuation">(</span><span class="tok-variableName">toggleHelp</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span> <span class="tok-variableName">value</span> <span class="tok-operator">=</span> <span class="tok-variableName">e</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span>
+    <span class="tok-keyword">return</span> <span class="tok-variableName">value</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">provide</span><span class="tok-punctuation">:</span> <span class="tok-variableName tok-definition">f</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">showPanel</span><span class="tok-operator">.</span><span class="tok-propertyName">from</span><span class="tok-punctuation">(</span><span class="tok-variableName">f</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">on</span> <span class="tok-punctuation">=&gt;</span> <span class="tok-variableName">on</span> <span class="tok-operator">?</span> <span class="tok-variableName">createHelpPanel</span> <span class="tok-operator">:</span> <span class="tok-keyword">null</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The <code>provide</code> option wires this field up to the <code>showPanel</code> facet. The
+<code>createHelpPanel</code> function is defined like this:</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">createHelpPanel</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">dom</span> <span class="tok-operator">=</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createElement</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;div&quot;</span><span class="tok-punctuation">)</span>
+  <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">textContent</span> <span class="tok-operator">=</span> <span class="tok-string">&quot;F1: Toggle the help panel&quot;</span>
+  <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">className</span> <span class="tok-operator">=</span> <span class="tok-string">&quot;cm-help-panel&quot;</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">top</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">dom</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>It's not a very useful panel. The <a href="../../docs/ref/index.html#view.Panel">object</a> it returns
+can, apart from providing the panel's DOM structure, configure whether
+the panel should be at the top or bottom of the editor.</p>
+<p>Next we define a <a href="../../docs/ref/index.html#view.KeyBinding">key binding</a> that makes F1 toggle
+the field on and off.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">helpKeymap</span> <span class="tok-operator">=</span> <span class="tok-punctuation">[</span><span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">key</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;F1&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">run</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">dispatch</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+      <span class="tok-propertyName tok-definition">effects</span><span class="tok-punctuation">:</span> <span class="tok-variableName">toggleHelp</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">field</span><span class="tok-punctuation">(</span><span class="tok-variableName">helpPanelState</span><span class="tok-punctuation">)</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+    <span class="tok-keyword">return</span> <span class="tok-bool">true</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">]</span>
+</code></pre>
+<p>And tie everything together in the <code>helpPanel</code> function, which creates
+the extension that enables the field, the key binding, and a simple
+styling for the panel.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">keymap</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">helpTheme</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">baseTheme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;.cm-help-panel&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">padding</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;5px 10px&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#fffa8f&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">fontFamily</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;monospace&quot;</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">helpPanel</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">[</span><span class="tok-variableName">helpPanelState</span><span class="tok-punctuation">,</span> <span class="tok-variableName">keymap</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">helpKeymap</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span> <span class="tok-variableName">helpTheme</span><span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<style>.cm-editor { height: 140px }</style>
+<div id=editor></div>
+<script defer src="../../codemirror.js"></script>
+<script defer src="help-panel.js"></script>
+<h2 id="dynamic-panel-content" tabindex="-1">Dynamic Panel Content</h2>
+<p>It is often necessary to keep the content of a panel in sync with the
+rest of the editor. For this purpose, the <a href="../../docs/ref/index.html#view.Panel">object</a>
+returned by a panel constructor may have an
+<a href="../../docs/ref/index.html#view.Panel.update"><code>update</code></a> method that, much like the <code>update</code>
+method in view plugins, gets called every time the editor view
+updates.</p>
+<p>Here we'll build a little extension that sets up a word-counting panel.</p>
+<p>First we need a (very crude, entirely Unicode-unaware) function that
+counts the words in a document.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">Text</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/state&quot;</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">countWords</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">doc</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Text</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">count</span> <span class="tok-operator">=</span> <span class="tok-number">0</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">iter</span> <span class="tok-operator">=</span> <span class="tok-variableName">doc</span><span class="tok-operator">.</span><span class="tok-propertyName">iter</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">while</span> <span class="tok-punctuation">(</span><span class="tok-operator">!</span><span class="tok-variableName">iter</span><span class="tok-operator">.</span><span class="tok-propertyName">next</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-operator">.</span><span class="tok-propertyName">done</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">inWord</span> <span class="tok-operator">=</span> <span class="tok-bool">false</span>
+    <span class="tok-keyword">for</span> <span class="tok-punctuation">(</span><span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">i</span> <span class="tok-operator">=</span> <span class="tok-number">0</span><span class="tok-punctuation">;</span> <span class="tok-variableName">i</span> <span class="tok-operator">&lt;</span> <span class="tok-variableName">iter</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-operator">.</span><span class="tok-propertyName">length</span><span class="tok-punctuation">;</span> <span class="tok-variableName">i</span><span class="tok-operator">++</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">word</span> <span class="tok-operator">=</span> <span class="tok-string2">/\w/</span><span class="tok-operator">.</span><span class="tok-propertyName">test</span><span class="tok-punctuation">(</span><span class="tok-variableName">iter</span><span class="tok-operator">.</span><span class="tok-propertyName">value</span><span class="tok-punctuation">[</span><span class="tok-variableName">i</span><span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">word</span> <span class="tok-operator">&amp;&amp;</span> <span class="tok-operator">!</span><span class="tok-variableName">inWord</span><span class="tok-punctuation">)</span> <span class="tok-variableName">count</span><span class="tok-operator">++</span>
+      <span class="tok-variableName">inWord</span> <span class="tok-operator">=</span> <span class="tok-variableName">word</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+  <span class="tok-keyword">return</span> <span class="tok-string2">`Word count: </span><span class="tok-punctuation">${</span><span class="tok-variableName">count</span><span class="tok-punctuation">}</span><span class="tok-string2">`</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>Next, a <a href="../../docs/ref/index.html#view.PanelConstructor">panel constructor</a> building a panel
+that re-counts the words every time the document changes.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">,</span> <span class="tok-variableName tok-definition">Panel</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">wordCountPanel</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">view</span><span class="tok-punctuation">:</span> <span class="tok-typeName">EditorView</span><span class="tok-punctuation">)</span><span class="tok-punctuation">:</span> <span class="tok-typeName">Panel</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">dom</span> <span class="tok-operator">=</span> <span class="tok-variableName">document</span><span class="tok-operator">.</span><span class="tok-propertyName">createElement</span><span class="tok-punctuation">(</span><span class="tok-string">&quot;div&quot;</span><span class="tok-punctuation">)</span>
+  <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">textContent</span> <span class="tok-operator">=</span> <span class="tok-variableName">countWords</span><span class="tok-punctuation">(</span><span class="tok-variableName">view</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-punctuation">)</span>
+  <span class="tok-keyword">return</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">dom</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">update</span><span class="tok-punctuation">(</span><span class="tok-variableName tok-definition">update</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+      <span class="tok-keyword">if</span> <span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">docChanged</span><span class="tok-punctuation">)</span>
+        <span class="tok-variableName">dom</span><span class="tok-operator">.</span><span class="tok-propertyName">textContent</span> <span class="tok-operator">=</span> <span class="tok-variableName">countWords</span><span class="tok-punctuation">(</span><span class="tok-variableName">update</span><span class="tok-operator">.</span><span class="tok-propertyName">state</span><span class="tok-operator">.</span><span class="tok-propertyName">doc</span><span class="tok-punctuation">)</span>
+    <span class="tok-punctuation">}</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>And finally, a function that build the extension that enables the
+panel in an editor.</p>
+<pre><code class="language-typescript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">showPanel</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">function</span> <span class="tok-variableName tok-definition">wordCounter</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+  <span class="tok-keyword">return</span> <span class="tok-variableName">showPanel</span><span class="tok-operator">.</span><span class="tok-propertyName">of</span><span class="tok-punctuation">(</span><span class="tok-variableName">wordCountPanel</span><span class="tok-punctuation">)</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<div id=count-editor></div>
+<script defer src="word-count.js"></script>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/panel/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:19 GMT -->
+</html>

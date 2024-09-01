@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/ie11/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:16 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror IE11 Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-running-on-internet-explorer-11" tabindex="-1">Example: Running On Internet Explorer 11</h1>
+<p>CodeMirror is entirely written with ECMAScript 2018 syntax (avoiding
+some constructs that are awkward or verbose to compile down to ES5)
+using, almost entirely, the ES5 standard library.</p>
+<p>That means that you don't have to polyfill a lot, to run it on
+Internet Explorer, but you do have to compile the syntax down to
+ES5—the distributed files are in ES2015 syntax. Since you'll need to
+use some kind of
+<a href="https://medium.freecodecamp.org/javascript-modules-part-2-module-bundling-5020383cf306">bundler</a>
+to load the modules anyway, you could use a bundler plugin that wires
+in <a href="https://babeljs.io/">Babel</a> or another syntax-downgrader.</p>
+<p>A <a href="https://rollupjs.org/">rollup</a> setup that does this using
+might look like this:</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-variableName tok-definition">babel</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@rollup/plugin-babel&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-variableName tok-definition">resolve</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@rollup/plugin-node-resolve&quot;</span>
+
+<span class="tok-keyword">export</span> <span class="tok-keyword">default</span> <span class="tok-punctuation">{</span>
+  <span class="tok-propertyName tok-definition">input</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;./editor.js&quot;</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">output</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">file</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;./www/editor.js&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">format</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;umd&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-propertyName tok-definition">plugins</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">[</span>
+    <span class="tok-variableName">babel</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span><span class="tok-punctuation">,</span>
+    <span class="tok-variableName">resolve</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span>
+  <span class="tok-punctuation">]</span>
+<span class="tok-punctuation">}</span>
+</code></pre>
+<p>All <code>for/of</code> loops in the library are on arrays, so you can optimize
+by using a Babel plugin like
+<a href="https://github.com/jridgewell/babel-plugin-transform-for-of-as-array">transform-for-of-as-array</a>
+if you want.</p>
+<p>There are three library features that the library uses but IE11
+doesn't support. For these you'll need to load
+<a href="https://en.wikipedia.org/wiki/Polyfill_(programming)">polyfills</a> of
+some kind.</p>
+<ul>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise"><code>Promise</code></a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign"><code>Object.assign</code></a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/API/ChildNode/remove"><code>ChildNode.remove</code></a></li>
+</ul>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/ie11/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:16 GMT -->
+</html>

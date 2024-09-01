@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang=en-US>
+
+<!-- Mirrored from codemirror.net/examples/styling/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:15 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<meta charset=utf8>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>CodeMirror Styling Example</title>
+<link rel=stylesheet href=../../style/site.css>
+<link rel=icon href=../../style/logo.svg>
+
+<header>
+  <nav>
+    <a class=logo href="../../index.html">CodeMirror</a>
+    <div class=navlinks>
+      <a href="../index.html" class=active>Examples</a>
+      <a href="../../docs/index.html" >Documentation</a>
+      <a href="../../try/index.html" >Try</a>
+      <a href="https://discuss.codemirror.net/">Discuss</a>
+      <a href="https://github.com/codemirror/dev/">GitHub</a>
+      <a href="../../5/index.html">Version 5</a>
+    </div>
+  </nav>
+</header><article><h1 id="example%3A-styling" tabindex="-1">Example: Styling</h1>
+<p>CodeMirror uses a CSS-in-JS system to be able to include its styles
+directly in the script files. This means you don't have to include a
+library CSS file in your page for the editor to work—both the editor
+view's own styling and any styling defined for dependencies are
+automatically pulled in through the JavaScript module system.</p>
+<p><a href="../../docs/ref/index.html#view.EditorView%5Etheme">Themes</a> are simply extensions that tell the
+editor to mount an additional <a href="https://github.com/marijnh/style-mod#documentation">style
+module</a> and add
+the (generated) class name that enables those styles to its outer DOM
+element.</p>
+<h2 id="old-fashioned-css" tabindex="-1">Old-Fashioned CSS</h2>
+<p>The important elements in the editor have regular (non-generated) CSS
+class names, which can be targeted with manually written style sheets.
+For example, the outer element has class <code>cm-editor</code>.</p>
+<p>However, the CSS rules injected by the library will be prefixed with
+an extra generated class name, so that they only apply when explicitly
+enabled. That means that if you need to override them, you must take
+care to make your own rules at least as specific as the injected
+rules, for example by prefixing them with <code>.cm-editor</code>. They only need
+to be <em>as</em> specific, not more specific, because the injected rules are
+placed before any other style sheets, and will thus have a lower
+default precedence than your rules.</p>
+<pre><code class="language-css">.<span class="tok-className">cm-editor</span>.<span class="tok-className">cm-focused</span> <span class="tok-punctuation">{</span> <span class="tok-propertyName">outline</span><span class="tok-punctuation">:</span> <span class="tok-number">2</span><span class="tok-keyword">px</span> <span class="tok-atom">solid</span> <span class="tok-atom">cyan</span> <span class="tok-punctuation">}</span>
+.<span class="tok-className">cm-editor</span> .<span class="tok-className">cm-content</span> <span class="tok-punctuation">{</span> <span class="tok-propertyName">font-family</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;Consolas&quot;</span> <span class="tok-punctuation">}</span>
+</code></pre>
+<p>Note that the <code>cm-focused</code> rule applies directly to the element
+that'll have the <code>cm-editor</code> class, and thus needs no space between
+the selectors, whereas the <code>cm-content</code> rule does need one because it
+applies to a node inside the editor.</p>
+<h2 id="things-you-can-style" tabindex="-1">Things you can Style</h2>
+<p>An editor (with a <a href="../../docs/ref/index.html#h_gutters">gutter</a> and
+<a href="../../docs/ref/index.html#view.drawSelection"><code>drawSelection</code></a> enabled) has a DOM structure
+like this:</p>
+<pre><code class="language-html"><span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-editor [cm-focused] [generated classes]&quot;</span><span class="tok-punctuation">&gt;</span>
+  <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-scroller&quot;</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-gutters&quot;</span><span class="tok-punctuation">&gt;</span>
+      <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-gutter [...]&quot;</span><span class="tok-punctuation">&gt;</span>
+        <span class="tok-comment">&lt;!-- One gutter element for each line --&gt;</span>
+        <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-gutterElement&quot;</span><span class="tok-punctuation">&gt;</span>...<span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+      <span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-content&quot;</span> <span class="tok-propertyName">contenteditable</span><span class="tok-operator">=</span><span class="tok-string">&quot;true&quot;</span><span class="tok-punctuation">&gt;</span>
+      <span class="tok-comment">&lt;!-- The actual document content --&gt;</span>
+      <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-line&quot;</span><span class="tok-punctuation">&gt;</span>Content goes here<span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+      <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-line&quot;</span><span class="tok-punctuation">&gt;</span>...<span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-selectionLayer&quot;</span><span class="tok-punctuation">&gt;</span>
+      <span class="tok-comment">&lt;!-- Positioned rectangles to draw the selection --&gt;</span>
+      <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-selectionBackground&quot;</span><span class="tok-punctuation">&gt;</span><span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-cursorLayer&quot;</span><span class="tok-punctuation">&gt;</span>
+      <span class="tok-comment">&lt;!-- Positioned elements to draw cursors --&gt;</span>
+      <span class="tok-punctuation">&lt;</span><span class="tok-typeName">div</span> <span class="tok-propertyName">class</span><span class="tok-operator">=</span><span class="tok-string">&quot;cm-cursor&quot;</span><span class="tok-punctuation">&gt;</span><span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+    <span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+  <span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+<span class="tok-punctuation">&lt;/</span><span class="tok-typeName">div</span><span class="tok-punctuation">&gt;</span>
+</code></pre>
+<p>Of course, there are limits to how you can style the editor. Things
+like making the editor lines <code>display: inline</code> or the cursor
+<code>position: fixed</code> will just break stuff. But within reasonable bounds,
+the library tries to be robust when it comes to styling.</p>
+<ul>
+<li>
+<p>You can style content text with varying fonts, size, color, etc.
+The editor does not expect a monospace font or a fixed line height.</p>
+</li>
+<li>
+<p>To set the outer padding for a document, you add vertical padding
+to <code>cm-content</code> and horizontal padding to <code>cm-line</code>.</p>
+</li>
+<li>
+<p>By default, the editor adjusts to the height of its content, but
+you can make <code>cm-scroller</code> <code>overflow: auto</code>, and assign a <code>height</code>
+or <code>max-height</code> to <code>cm-editor</code>, to make the editor scrollable.</p>
+</li>
+<li>
+<p>Colors can be adjusted throughout, but when adding background
+colors to content, it is recommended to use partially transparent
+colors. That way such a style doesn't hide other styling behind it
+(including the selection).</p>
+</li>
+<li>
+<p><a href="https://developer.mozilla.org/en-US/docs/Web/CSS/white-space">Whitespace</a>
+behavior inside the editor can be <code>pre</code> or <code>pre-wrap</code> to control
+line wrapping. (The <a href="../../docs/ref/index.html#view.EditorView%5ElineWrapping">line wrapping
+extension</a> simply sets it to
+<code>pre-wrap</code>.)</p>
+</li>
+<li>
+<p>The editor's <a href="../../docs/ref/index.html#view.EditorView.textDirection">text direction</a> is
+automatically derived from the <code>direction</code> style of the content
+DOM.</p>
+</li>
+<li>
+<p>The library supports having CSS transforms applied to its parent
+elements that do 2D scaling and translation. Anything else
+(rotation, 3D transformation, shearing) <em>will</em> break the editor.</p>
+</li>
+</ul>
+<h2 id="themes" tabindex="-1">Themes</h2>
+<p>Themes are defined with <a href="../../docs/ref/index.html#view.EditorView%5Etheme"><code>EditorView.theme</code></a>.
+That function takes an object whose properties are CSS selectors and
+whose values are
+<a href="https://github.com/marijnh/style-mod#documentation">styles</a>, and
+returns an extension that installs the theme.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">myTheme</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">theme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;&amp;&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">color</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;white&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#034&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;.cm-content&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">caretColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#0e9&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;&amp;.cm-focused .cm-cursor&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">borderLeftColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#0e9&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;&amp;.cm-focused .cm-selectionBackground, ::selection&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#074&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;.cm-gutters&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#045&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">color</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#ddd&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">border</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;none&quot;</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">,</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">dark</span><span class="tok-punctuation">:</span> <span class="tok-bool">true</span><span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>There's a few things going on here. Firstly, some of the rules contain
+“<code>&amp;</code>” placeholders. This indicates the position of the outer editor
+element in the rule. By default, a generated class name is prefixed to
+the rules, with a space after it (so <code>&quot;.cm-content&quot;</code> becomes <code>&quot;.gen001 .cm-content&quot;</code>). But in rules that directly target the outer element
+(which gets the generated class), that doesn't work, and you have to
+place an <code>&amp;</code> character to indicate where to insert the class selector.</p>
+<p>Secondly, because there are two ways of showing the selection in
+CodeMirror (the native selection and the
+<a href="../../docs/ref/index.html#view.drawSelection"><code>drawSelection</code></a> extension), themes will
+usually want to style both—the <code>caret-color</code> and <code>::selection</code> rules
+apply to the native selection, whereas the <code>.cm-cursor</code> and
+<code>.cm-selectionBackground</code> rules style the library-drawn selection.</p>
+<p>Lastly, since this is a dark theme, it passes a <code>dark: true</code> option,
+so that the editor will enable its dark default styles for things not
+explicitly styled by the theme.</p>
+<p>A real theme will want to style a few more things, including elements
+created by extensions (such as <a href="../../docs/ref/index.html#h_panels">panels</a> and
+<a href="../../docs/ref/index.html#h_tooltips">tooltips</a>). You'll also usually want to include a
+<a href="../../docs/ref/index.html#language.HighlightStyle">highlight style</a> in your theme. You can
+see the <a href="https://github.com/codemirror/theme-one-dark">One Dark theme</a>
+for an example, and possibly copy and modify it to create your own
+theme.</p>
+<h2 id="base-themes" tabindex="-1">Base Themes</h2>
+<p>When you create an extension that adds some new DOM structure to the
+editor, you'll usually want to include a <a href="../../docs/ref/index.html#view.EditorView%5EbaseTheme">base
+theme</a> that provides a default style for
+the elements. Base themes act a lot like regular themes, except that
+they are mounted with lower precedence and can provide separate rules
+for dark and light themes.</p>
+<p>For example, a hypothetical extension that replaces all instances of
+the letter o with blue circles might want to include a base theme like
+this...</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">EditorView</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/view&quot;</span>
+
+<span class="tok-keyword">let</span> <span class="tok-variableName tok-definition">baseTheme</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">baseTheme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;.cm-o-replacement&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">display</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;inline-block&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">width</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;.5em&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">height</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;.5em&quot;</span><span class="tok-punctuation">,</span>
+    <span class="tok-propertyName tok-definition">borderRadius</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;.25em&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;&amp;light .cm-o-replacement&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#04c&quot;</span>
+  <span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;&amp;dark .cm-o-replacement&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span>
+    <span class="tok-propertyName tok-definition">backgroundColor</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#5bf&quot;</span>
+  <span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>The <code>&amp;dark</code> and <code>&amp;light</code> placeholders act much like <code>&amp;</code>, except that
+they expand to a class that is only enabled when the editor's theme is
+light or dark. In this case, the base theme gives its circles a
+brighter color in a dark theme (on the assumption that the background
+will be darker there).</p>
+<p>The extension returned by <code>baseTheme</code> must be added to the editor
+configuration to (reliably) take effect—the style rules will only be
+mounted in the DOM when an editor that uses them is created. It is
+usually bundled up in an array with other related extensions and
+returned from the exported function that produces the extensions for
+the feature (see for example the <a href="../zebra/index.html">zebra stripes example</a>).</p>
+<h2 id="highlighting" tabindex="-1">Highlighting</h2>
+<p>Code highlighting uses a somewhat different system from editor-wide
+theming. Code styles are also created with JavaScript and enabled with
+an editor extension. But by default they don't use stable,
+non-generated class names. A <a href="../../docs/ref/index.html#language.HighlightStyle">highlight
+style</a> directly returns the class names
+for the syntactic tokens.</p>
+<p>Highlight associate <a href="https://lezer.codemirror.net/docs/ref/#highlight.Tag">highlighting
+tags</a> with
+styles. For example, this one assigns styles to keywords and comments.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">tags</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@lezer/highlight&quot;</span>
+<span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">HighlightStyle</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">myHighlightStyle</span> <span class="tok-operator">=</span> <span class="tok-variableName">HighlightStyle</span><span class="tok-operator">.</span><span class="tok-propertyName">define</span><span class="tok-punctuation">(</span><span class="tok-punctuation">[</span>
+  <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">tag</span><span class="tok-punctuation">:</span> <span class="tok-variableName">tags</span><span class="tok-operator">.</span><span class="tok-propertyName">keyword</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">color</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#fc6&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">tag</span><span class="tok-punctuation">:</span> <span class="tok-variableName">tags</span><span class="tok-operator">.</span><span class="tok-propertyName">comment</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">color</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;#f5d&quot;</span><span class="tok-punctuation">,</span> <span class="tok-propertyName tok-definition">fontStyle</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;italic&quot;</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">]</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>Each of the objects given to
+<a href="../../docs/ref/index.html#language.HighlightStyle%5Edefine"><code>HighlightStyle.define</code></a> mentions a
+<a href="https://lezer.codemirror.net/docs/ref/#highlight.tags">tag</a> (which
+are assigned to tokens by <a href="../lang-package/index.html">language packages</a>), and
+otherwise contains style properties just like the objects in a theme.</p>
+<p>When defining an editor theme, you'll usually want to provide both a
+theme extension and a highlight style that looks good with it. Wrap a
+highlight style (or other
+<a href="https://lezer.codemirror.net/docs/ref/#highlight.Highlighter">highlighter</a>)
+in <a href="../../docs/ref/index.html#language.syntaxHighlighting"><code>syntaxHighlighting</code></a> to create an
+extension that enables it.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">import</span> <span class="tok-punctuation">{</span><span class="tok-variableName tok-definition">syntaxHighlighting</span><span class="tok-punctuation">}</span> <span class="tok-keyword">from</span> <span class="tok-string">&quot;@codemirror/language&quot;</span>
+
+<span class="tok-comment">// In your extensions...</span>
+<span class="tok-variableName">syntaxHighlighting</span><span class="tok-punctuation">(</span><span class="tok-variableName">myHighlightStyle</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>If you need to style tokens with plain old CSS, you can use the
+<a href="https://lezer.codemirror.net/docs/ref/#highlight.classHighlightStyle"><code>classHighlightStyle</code></a>,
+which just adds a static class (for example <code>cmt-keyword</code>) to tokens,
+without actually defining any rules for that class.</p>
+<h2 id="overflow-and-scrolling" tabindex="-1">Overflow and Scrolling</h2>
+<p>Without any custom styling, a CodeMirror editor grows vertically,
+scrolls (rather than wraps) long lines, and doesn't have any border
+except a focus ring when focused.</p>
+<p>To enable line wrapping, add the
+<a href="../../docs/ref/index.html#view.EditorView%5ElineWrapping"><code>EditorView.lineWrapping</code></a> extension
+to your configuration. It is also possible to adjust the <code>white-space</code>
+style of the content element in some other way, but only <code>pre</code> and
+<code>pre-wrap</code> are supported by the library, and wrapping can be
+unreliable if you don't also set <code>overflow-wrap: anywhere</code>, so it is
+recommended to just use this extension to enable wrapping.</p>
+<p>Adjusting the vertical behavior of the editor can be done by giving
+its outer element a height, and setting <code>overflow: auto</code> on the
+scroller element.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">fixedHeightEditor</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">theme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;&amp;&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">height</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;300px&quot;</span><span class="tok-punctuation">}</span><span class="tok-punctuation">,</span>
+  <span class="tok-string">&quot;.cm-scroller&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">overflow</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;auto&quot;</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+<p>To let the editor grow until it reaches a maximum height, and scroll
+from that point on, use <code>max-height</code> instead of <code>height</code> in a setup
+like the one above.</p>
+<p>Giving the editor a minimum height is, due to some obscure CSS
+limitations, a bit more involved—you have to assign that height to the
+content and the gutter, not the wrapper element, to make sure that
+those take up the entire height of the editor.</p>
+<pre><code class="language-javascript"><span class="tok-keyword">const</span> <span class="tok-variableName tok-definition">minHeightEditor</span> <span class="tok-operator">=</span> <span class="tok-variableName">EditorView</span><span class="tok-operator">.</span><span class="tok-propertyName">theme</span><span class="tok-punctuation">(</span><span class="tok-punctuation">{</span>
+  <span class="tok-string">&quot;.cm-content, .cm-gutter&quot;</span><span class="tok-punctuation">:</span> <span class="tok-punctuation">{</span><span class="tok-propertyName tok-definition">minHeight</span><span class="tok-punctuation">:</span> <span class="tok-string">&quot;200px&quot;</span><span class="tok-punctuation">}</span>
+<span class="tok-punctuation">}</span><span class="tok-punctuation">)</span>
+</code></pre>
+</article><footer>
+  <nav>
+    <div class=navlinks>
+      <a href="http://contributor-covenant.org/version/1/1/0/">Code of Conduct</a>
+      <a href="https://github.com/codemirror/dev/issues">Report an Issue</a>
+    </div>
+  </nav>
+</footer>
+
+
+<!-- Mirrored from codemirror.net/examples/styling/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 01 Jul 2024 17:27:15 GMT -->
+</html>
